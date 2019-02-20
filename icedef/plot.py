@@ -160,6 +160,7 @@ def plot_track(*latlons, **kwargs):
 
     title = kwargs.pop('title', '')
     ax.set_title(title)
+
     if show_legend:
         ax.legend(**legend_kwargs)
 
@@ -221,6 +222,8 @@ def get_map_kwargs(min_lat, min_lon, max_lat, max_lon, **kwargs):
 
 def plot_image(lats, lons, data, **kwargs):
 
+    fig, ax = plt.subplots()
+
     min_lat = min(lats)
     min_lon = min(lons)
     max_lat = max(lats)
@@ -231,6 +234,7 @@ def plot_image(lats, lons, data, **kwargs):
     kwargs.update(map_kwargs)
 
     map_ = get_map(**kwargs)
+    draw_map(map_, **map_kwargs)
 
     pcolormesh = True
     imshow = False
@@ -246,6 +250,11 @@ def plot_image(lats, lons, data, **kwargs):
         x0, y0 = map_(min_lon, min_lat)
         x1, y1 = map_(max_lon, max_lat)
         map_.imshow(data, extent=[x0, x1, y0, y1], origin='lower')
+
+    title = kwargs.pop('title', '')
+    ax.set_title(title)
+
+    return fig, ax
 
 
 def animate_field(lats, lons, times, u, v, gap=10, time_format='%Y-%m-%d %H'):
