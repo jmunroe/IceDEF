@@ -21,7 +21,7 @@ plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=LARGE_SIZE)   # fontsize of the figure title
 
 
-def get_map(**kwargs):
+def get_map(draw=False, **kwargs):
     """This function returns a Basemap map.
 
     Args:
@@ -47,6 +47,9 @@ def get_map(**kwargs):
                    lon_0=lon_0, lat_0=lat_0, lat_ts=lat_ts,
                    resolution=resolution, area_thresh=area_thresh,
                    llcrnrlon=llcrnrlon, llcrnrlat=llcrnrlat, urcrnrlon=urcrnrlon, urcrnrlat=urcrnrlat)
+
+    if draw:
+        map_ = draw_map(map_, **kwargs)
 
     return map_
 
@@ -91,6 +94,8 @@ def draw_map(map_, **kwargs):
             except IndexError:
                 pass
 
+    return map_
+
 
 def plot_track(*latlons, **kwargs):
 
@@ -125,7 +130,7 @@ def plot_track(*latlons, **kwargs):
 
     fig, ax = plt.subplots()
     map_ = get_map(**map_kwargs)
-    draw_map(map_, **map_kwargs)
+    map_ = draw_map(map_, **map_kwargs)
 
     labels = kwargs.pop('labels', None)
     quiver_labels = quiver_kwargs.get('label', None)
@@ -234,7 +239,7 @@ def plot_image(lats, lons, data, **kwargs):
     kwargs.update(map_kwargs)
 
     map_ = get_map(**kwargs)
-    draw_map(map_, **map_kwargs)
+    map_ = draw_map(map_, **map_kwargs)
 
     pcolormesh = True
     imshow = False
