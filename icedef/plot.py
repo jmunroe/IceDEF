@@ -128,7 +128,6 @@ def plot_track(*latlons, **kwargs):
     new_map_kwargs = get_map_kwargs(min_lat, min_lon, max_lat, max_lon, **map_kwargs)
     map_kwargs.update(new_map_kwargs)
 
-    fig, ax = plt.subplots()
     map_ = get_map(**map_kwargs)
     map_ = draw_map(map_, **map_kwargs)
 
@@ -150,11 +149,14 @@ def plot_track(*latlons, **kwargs):
 
     i = 0
 
+    sizes = kwargs.pop('sizes', [1] * 100)
+    markers = kwargs.pop('markers', [None] * 100)
+
     for latlon in latlons:
 
         lats, lons = latlon
         eastings, northings = map_(lons, lats)
-        ax.scatter(eastings, northings, label=labels[i], **scatter_kwargs)
+        ax.scatter(eastings, northings, label=labels[i], marker=markers[i], s=sizes[i], **scatter_kwargs)
         i += 1
 
     vectors = kwargs.pop('vectors', None)
@@ -162,6 +164,15 @@ def plot_track(*latlons, **kwargs):
     if vectors is not None:
 
         ax = plot_quivers(eastings, northings, vectors, ax, **quiver_kwargs)
+
+    annotation_args = kwargs.pop('annotation_args', None)
+    annotation_kwargs = kwargs.pop('annotation_kwargs', {})
+
+    if annotation_args is not None:
+        s = annotation_args['s']
+        xy = annotation_args['xy']
+        x, y = map_(xy[0], xy[1])
+        ax.annotate(s, (x, y), **annotation_kwargs)
 
     title = kwargs.pop('title', '')
     ax.set_title(title)
