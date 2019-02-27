@@ -99,6 +99,8 @@ def draw_map(map_, **kwargs):
 
 def plot_track(*latlons, **kwargs):
 
+    fig, ax = plt.subplots()
+
     min_lat = None
     min_lon = None
     max_lat = None
