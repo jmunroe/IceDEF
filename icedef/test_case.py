@@ -1,5 +1,6 @@
 import numpy as np
 import xarray as xr
+from icedef import plot
 from icedef import statoil_arcticnet_data as sd
 
 
@@ -22,12 +23,26 @@ class TestCase:
         self.start_location = self.start_latitude, self.start_longitude
         self.start_velocity = sd.get_iceberg_velocity_from_dataframe(self.df, 0, 10)
 
+    def plot_track(self, **kwargs):
+
+        fig, ax = plot.plot_track([self.ref_lats.values, self.ref_lons.values], **kwargs)
+
 
 class TestCaseA(TestCase):
 
     START_TIME = np.datetime64('2015-05-06T15:27:39')
     END_TIME = np.datetime64('2015-05-07T06:25:51')
     BEACON_ID = '90679'
+
+    def __init__(self):
+        super().__init__(beacon_id=self.BEACON_ID, start_time=self.START_TIME, end_time=self.END_TIME)
+
+
+class TestCaseB(TestCase):
+
+    START_TIME = np.datetime64('2015-04-24T22:53:29')
+    END_TIME = START_TIME + np.timedelta64(1, 'D')
+    BEACON_ID = '20498'
 
     def __init__(self):
         super().__init__(beacon_id=self.BEACON_ID, start_time=self.START_TIME, end_time=self.END_TIME)
