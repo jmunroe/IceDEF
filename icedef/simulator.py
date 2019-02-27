@@ -193,6 +193,18 @@ class Simulator:
 
         return fig, ax
 
+    def add_result(self, times, lats, lons, label='added'):
+
+        results = {'latitude': lats, 'longitude': lons}
+
+        xds = xr.Dataset()
+
+        for key, value in results.items():
+            xarr = xr.DataArray(data=value, coords=[times], dims=['time'])
+            xds[key] = xarr
+
+        self.results[label] = xds
+
 
 def compute_mse(simulation_vectors, reference_vectors):
 
@@ -270,7 +282,7 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
 
     else:
         results = {'latitude': np.zeros(nt),
-                       'longitude': np.zeros(nt)}
+                    'longitude': np.zeros(nt)}
         kwargs = {
             'form_drag_coefficient_in_air': kwargs.pop('Ca', iceberg_.FORM_DRAG_COEFFICIENT_IN_AIR),
             'form_drag_coefficient_in_water': kwargs.pop('Cw', iceberg_.FORM_DRAG_COEFFICIENT_IN_WATER),
@@ -307,7 +319,7 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
                                                 results['iceberg_northward_velocity'][:i + 1],
                                                 **kwargs)
             else:
-
+                
                 dx, dy = time_stepper(drift_model, dt, times[:i+1], results['longitude'][:i+1], results['latitude'][:i+1], **kwargs)
 
         else:
