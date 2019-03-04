@@ -154,6 +154,12 @@ def plot_track(*latlons, **kwargs):
     sizes = kwargs.pop('sizes', [1] * 100)
     markers = kwargs.pop('markers', [None] * 100)
 
+    if isinstance(sizes, int):
+        sizes = [sizes] * 100
+
+    if isinstance(markers, int):
+        sizes = [marker] * 100
+
     for latlon in latlons:
 
         lats, lons = latlon
