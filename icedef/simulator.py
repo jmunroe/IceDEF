@@ -4,7 +4,7 @@
 import numpy as np
 import xarray as xr
 from copy import deepcopy
-from scipy.optimize import minimize
+from scipy.optimize import minimize, differential_evolution
 from icedef import iceberg, metocean, drift, tools, timesteppers, plot
 
 
@@ -219,7 +219,7 @@ class Simulator:
         else:
             return results
 
-    def run_optimization(self, keys, x0, bounds, reference_vectors):
+    def run_optimization(self, keys, x0, bounds, reference_vectors, optimizer='minimize', **kwargs):
         """This function optimizes user specified drift simulation parameters using the Scipy minimize function.
 
         Args:
@@ -233,13 +233,20 @@ class Simulator:
 
         """
         f = self.optimization_wrapper
-        optimization_result = minimize(f, x0=x0, bounds=bounds, args=(keys, reference_vectors))
+        if optimizer == 'minimize':
+            optimization_result = minimize(f, x0=x0, bounds=bounds, args=(keys, reference_vectors), **kwargs)
+        elif optimizer == 'differential_evolution':
+            optimization_result = differential_evolution(f, bounds=bounds, args=(keys, reference_vectors), **kwargs)
+        else:
+            optimization_result = None
+            print('Unrecognized optimizer. Options are: minimize or differential_evolution.')
 
         return optimization_result
 
     def optimization_wrapper(self, values, keys, reference_vectors):
-        kwargs = dict(zip(keys, values))
-        xds = run_simulation(self.time_frame, self.start_location, **kwargs)
+
+        sim_kwargs = dict(zip(keys, values))
+        xds = run_simulation(self.time_frame, self.start_location, **sim_kwargs)
         simulation_vectors = xds['latitude'], xds['longitude']
         square_errors = compute_norms(simulation_vectors, reference_vectors)
         mean_square_error = np.mean(square_errors)
@@ -288,7 +295,12 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
     dt = time_step.item().total_seconds()
     nt = int(np.timedelta64(end_time - start_time, 's').item().total_seconds() / dt)
 
-    size = kwargs.pop('iceberg_size', 'LG')
+    waterline_length = kwargs.pop('waterline_length', None)
+    sail_height = kwargs.pop('sail_height', None)
+    if waterline_length is not None and sail_height is not None:
+        size = waterline_length, sail_height
+    else:
+        size = kwargs.pop('iceberg_size', 'LG')
     shape = kwargs.pop('iceberg_shape', 'TAB')
     iceberg_ = kwargs.pop('iceberg', iceberg.quickstart(start_time, start_location, velocity=start_velocity, size=size, shape=shape))
 
