@@ -158,7 +158,7 @@ def plot_track(*latlons, **kwargs):
         sizes = [sizes] * 100
 
     if isinstance(markers, int):
-        sizes = [marker] * 100
+        markers = [markers] * 100
 
     for latlon in latlons:
 
@@ -222,6 +222,9 @@ def get_map_kwargs(min_lat, min_lon, max_lat, max_lon, **kwargs):
 
     pads = kwargs.pop('pads', [0.01] * 4)
 
+    if isinstance(pads, int) or isinstance(pads, float):
+        pads = [pads] * 4
+        
     min_lat_padded = min_lat - pads[1]
     max_lat_padded = max_lat + pads[3]
     min_lon_padded = min_lon - pads[2]
