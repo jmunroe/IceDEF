@@ -3,6 +3,7 @@
 
 import numpy as np
 import xarray as xr
+from copy import deepcopy
 from scipy.optimize import minimize
 from icedef import iceberg, metocean, drift, tools, timesteppers, plot
 
@@ -18,6 +19,110 @@ class DebugFileHandler(FileHandler):
         FileHandler.__init__(self, filename, mode, encoding, delay)
         self.formatter = Formatter('%(message)s')
         self.setFormatter(self.formatter)
+
+
+class Results:
+
+    def __init__(self, **kwargs):
+
+        self.map = kwargs.pop('map', plot.get_map())
+        self.data = {}
+
+    def add(self, times, lats, lons, label='added', add_xy=True):
+
+        if label in self.data:
+            self.remove(label)
+
+        if add_xy:
+            eastings, northings = self.map_lonlat_to_xy(lons, lats)
+            results = {'latitude': lats, 'longitude': lons, 'easting': eastings, 'northing': northings}
+        else:
+            results = {'latitude': lats, 'longitude': lons}
+
+        xds = xr.Dataset()
+
+        for key, value in results.items():
+            xarr = xr.DataArray(data=value, coords=[times], dims=['time'])
+            xds[key] = xarr
+
+        self.data[label] = xds
+
+    def add_dataset(self, dataset, label='added', add_xy=True):
+
+        if label in self.data:
+            self.remove(label)
+
+        if add_xy:
+            times = dataset['latitude']['time'].values
+            lats = dataset['latitude'].values
+            lons = dataset['longitude'].values
+            self.add(times, lats, lons, label=label)
+
+        else:
+            self.data[label] = dataset
+
+    def remove(self, label):
+        del self.data[label]
+
+    def map_lonlat_to_xy(self, lons, lats):
+        xs, ys = self.map(lons, lats)
+        return xs, ys
+
+    def compute_distance_between_two_tracks(self, label1, label2, units='km'):
+
+        data1 = self.data[label1]
+        data2 = self.data[label2]
+
+        if units == 'deg':
+            x_key = 'longitude'
+            y_key = 'latitude'
+
+        elif units == 'm' or units == 'km':
+            x_key = 'easting'
+            y_key = 'northing'
+
+        else:
+            print('Invalid units. Options are: deg, m, and km.')
+            x_key = None
+            y_key = None
+
+        x1s, y1s = data1[x_key], data1[y_key]
+        x2s, y2s = data2[x_key], data2[y_key]
+
+        stop_index = np.where(x1s['time'].values <= x2s['time'].values[-1])[0][-1]
+        norms = np.empty(stop_index + 1)
+
+        for i in range(stop_index + 1):
+
+            t = x1s['time'][i]
+            x1, y1 = x1s.values[i], y1s.values[i]
+            x2, y2 = x2s.interp(time=t, assume_sorted=True).values, y2s.interp(time=t, assume_sorted=True).values
+            norm = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            norms[i] = norm
+
+        if units == 'km':
+            norms /= 1000
+
+        return norms
+
+    def plot(self, keys, xy=False, **kwargs):
+
+        tracks = []
+
+        if xy:
+            x_key, y_key = 'easting', 'northing'
+
+        else:
+            x_key, y_key = 'longitude', 'latitude'
+
+        for key in keys:
+
+            track = [self.data[key][y_key].values, self.data[key][x_key].values]
+            tracks.append(track)
+
+        fig, ax = plot.plot_track(*tracks, **kwargs)
+
+        return fig, ax
 
 
 class Simulator:
@@ -59,7 +164,7 @@ class Simulator:
         self.iceberg = iceberg.quickstart(self.time_frame[0], self.start_location, velocity=self.start_velocity,
                                           size=self.iceberg_size, shape=self.iceberg_shape)
 
-        self.results = {}
+        self.results = Results(**{'map': kwargs.pop('map', plot.get_map())})
 
     def set_constant_current(self, constants):
         self.ocean = metocean.Ocean(self.time_frame, model=self.ocean_model, constants=constants)
@@ -77,11 +182,11 @@ class Simulator:
         self.iceberg = iceberg.quickstart(self.time_frame[0], self.start_location, velocity=self.start_velocity,
                                           size=self.iceberg_size, shape=self.iceberg_shape)
 
-    def run_simulation(self, store_results_as=None, **kwargs):
+    def run_simulation(self, label=None, **kwargs):
         """This method simulates iceberg drift.
 
         Args:
-            store_results_as (str): Key by which the results of the simulation will be saved in results attribute.
+            label (str): Key by which the results of the simulation will be saved in results attribute.
         """
 
         if not self.iceberg.time == self.time_frame[0]:
@@ -109,49 +214,10 @@ class Simulator:
 
         del log
 
-        if store_results_as is not None:
-
-            self.results[store_results_as] = results
-
-        return results
-
-    def run_simulation(self, store_results_as=None, **kwargs):
-        """This method simulates iceberg drift.
-
-        Args:
-            store_results_as (str): Key by which the results of the simulation will be saved in results attribute.
-        """
-
-        if not self.iceberg.time == self.time_frame[0]:
-            self.reload_iceberg()
-
-        kwargs['time_step'] = self.time_step
-        kwargs['time_stepper'] = self.time_stepper
-        kwargs['drift_model'] = self.drift_model
-        kwargs['ocean_model'] = self.ocean_model
-        kwargs['atmosphere_model'] = self.atmosphere_model
-
-        kwargs['ocean'] = self.ocean
-        kwargs['atmosphere'] = self.atmosphere
-
-        kwargs['iceberg'] = self.iceberg
-
-        log = getLogger('{}'.format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-        file_handler = DebugFileHandler()
-        log.addHandler(file_handler)
-        log.setLevel(DEBUG)
-
-        kwargs['log'] = log
-
-        results = run_simulation(self.time_frame, self.start_location, self.start_velocity, **kwargs)
-
-        del log
-
-        if store_results_as is not None:
-
-            self.results[store_results_as] = results
-
-        return results
+        if label is not None:
+            self.results.add_dataset(results, label)
+        else:
+            return results
 
     def run_optimization(self, keys, x0, bounds, reference_vectors):
         """This function optimizes user specified drift simulation parameters using the Scipy minimize function.
@@ -166,64 +232,48 @@ class Simulator:
             optimization_result (scipy.optimize.optimize.OptimizeResult): Results from minimization.
 
         """
-
-        optimization_result = minimize(self.optimization_wrapper, x0=x0, bounds=bounds, args=(keys, reference_vectors))
+        f = self.optimization_wrapper
+        optimization_result = minimize(f, x0=x0, bounds=bounds, args=(keys, reference_vectors))
 
         return optimization_result
 
     def optimization_wrapper(self, values, keys, reference_vectors):
-
         kwargs = dict(zip(keys, values))
         xds = run_simulation(self.time_frame, self.start_location, **kwargs)
         simulation_vectors = xds['latitude'], xds['longitude']
-        mean_square_errors = compute_mse(simulation_vectors, reference_vectors)
+        square_errors = compute_norms(simulation_vectors, reference_vectors)
+        mean_square_error = np.mean(square_errors)
 
-        return np.mean(mean_square_errors)
-
-    def plot_track(self, keys, **kwargs):
-
-        tracks = []
-
-        for key in keys:
-
-            track = [self.results[key]['latitude'].values, self.results[key]['longitude'].values]
-            tracks.append(track)
-
-        fig, ax = plot.plot_track(*tracks, **kwargs)
-
-        return fig, ax
-
-    def add_result(self, times, lats, lons, label='added'):
-
-        results = {'latitude': lats, 'longitude': lons}
-
-        xds = xr.Dataset()
-
-        for key, value in results.items():
-            xarr = xr.DataArray(data=value, coords=[times], dims=['time'])
-            xds[key] = xarr
-
-        self.results[label] = xds
+        return mean_square_error
 
 
-def compute_mse(simulation_vectors, reference_vectors):
+def compute_norms(simulation_vectors, reference_vectors, units='deg', **kwargs):
 
-    sim_lats, sim_lons = simulation_vectors
-    ref_lats, ref_lons = reference_vectors
+    sim_lats, sim_lons = deepcopy(simulation_vectors)
+    ref_lats, ref_lons = deepcopy(reference_vectors)
 
-    mean_square_errors = []
+    if units == 'm' or units == 'km':
+        map_ = kwargs.pop('map', plot.get_map())
+        sim_lons.values, sim_lats.values = map_(sim_lons.values, sim_lats.values)
+        ref_lons.values, ref_lats.values = map_(ref_lons.values, ref_lats.values)
 
     stop_index = np.where(ref_lats['time'].values <= sim_lats['time'].values[-1])[0][-1]
+    norms = np.empty(stop_index + 1)
 
     for i in range(stop_index + 1):
 
         time = ref_lats['time'][i]
-        sim_lat = sim_lats.interp(time=time, assume_sorted=True)
-        sim_lon = sim_lons.interp(time=time, assume_sorted=True)
-        mean_square_error = np.sqrt((sim_lat - ref_lats[i])**2 + (sim_lon - ref_lons[i])**2)
-        mean_square_errors.append(mean_square_error)
+        ref_lat = ref_lats[i].values
+        ref_lon = ref_lons[i].values
+        sim_lat = sim_lats.interp(time=time, assume_sorted=True).values
+        sim_lon = sim_lons.interp(time=time, assume_sorted=True).values
+        norm = np.sqrt((sim_lat - ref_lat) ** 2 + (sim_lon - ref_lon) ** 2)
+        norms[i] = norm
 
-    return mean_square_errors
+    if units == 'km':
+        norms /= 1000
+
+    return norms
 
 
 def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
@@ -319,7 +369,7 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
                                                 results['iceberg_northward_velocity'][:i + 1],
                                                 **kwargs)
             else:
-                
+
                 dx, dy = time_stepper(drift_model, dt, times[:i+1], results['longitude'][:i+1], results['latitude'][:i+1], **kwargs)
 
         else:
