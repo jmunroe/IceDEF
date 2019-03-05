@@ -138,6 +138,13 @@ class Current:
                                        self.eastward_velocities.values,
                                        self.northward_velocities.values).interpolate
 
+    def offset(self, speed=0, angle=0):
+
+        self.directions.values += angle
+        self.speeds.values += speed
+        self.eastward_velocities.values = self.speeds.values * np.cos(np.deg2rad(self.directions.values) + np.pi / 2)
+        self.northward_velocities.values = self.speeds.values * np.sin(np.deg2rad(self.directions.values) + np.pi / 2)
+        
 
 class Atmosphere:
 
@@ -230,6 +237,13 @@ class Wind:
         self.interpolate = Interpolate((data.time.values, data.latitude.values, data.longitude.values),
                                        self.eastward_velocities.values,
                                        self.northward_velocities.values).interpolate
+
+    def offset(self, speed=0, angle=0):
+
+        self.directions.values += angle
+        self.speeds.values += speed
+        self.eastward_velocities.values = self.speeds.values * np.cos(np.deg2rad(self.directions.values) + np.pi / 2)
+        self.northward_velocities.values = self.speeds.values * np.sin(np.deg2rad(self.directions.values) + np.pi / 2)
 
 
 def fill_data_with_constant_value(data, **kwargs):
