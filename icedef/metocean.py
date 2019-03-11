@@ -8,6 +8,7 @@ import numpy as np
 import xarray as xr
 from urllib.request import urlretrieve
 from datetime import date, timedelta
+from astroML.stats import bivariate_normal
 from pandas import Timestamp
 from icedef import plot
 
@@ -96,7 +97,7 @@ class Ocean:
 
             print('Invalid model.')
 
-        self.current = Current(self.data)
+        self.current = Velocity(self.data)
 
     def animate_field(self):
 
@@ -104,46 +105,6 @@ class Ocean:
         times, lats, lons = self.data.time.values, self.data.latitude.values, self.data.longitude.values
 
         return plot.animate_field(lats, lons, times, u, v)
-
-
-class Current:
-
-    def __init__(self, data):
-
-        self.eastward_velocities = xr.DataArray(data=data.eastward_velocity.values,
-                                                coords=[('time', data.time.values),
-                                                        ('latitude', data.latitude.values),
-                                                        ('longitude', data.longitude.values)],
-                                                attrs=data.eastward_velocity.attrs)
-
-        self.northward_velocities = xr.DataArray(data=data.northward_velocity.values,
-                                                 coords=[('time', data.time.values),
-                                                         ('latitude', data.latitude.values),
-                                                         ('longitude', data.longitude.values)],
-                                                 attrs=data.eastward_velocity.attrs)
-
-        self.speeds = xr.DataArray(data=compute_magnitude(self.eastward_velocities.values,
-                                                          self.northward_velocities.values),
-                                   coords=[('time', data.time.values),
-                                           ('latitude', data.latitude.values),
-                                           ('longitude', data.longitude.values)])
-
-        self.directions = xr.DataArray(data=compute_direction(self.eastward_velocities.values,
-                                                              self.northward_velocities.values),
-                                       coords=[('time', data.time.values),
-                                               ('latitude', data.latitude.values),
-                                               ('longitude', data.longitude.values)])
-
-        self.interpolate = Interpolate((data.time.values, data.latitude.values, data.longitude.values),
-                                       self.eastward_velocities.values,
-                                       self.northward_velocities.values).interpolate
-
-    def offset(self, speed=0, angle=0):
-
-        self.directions.values += angle
-        self.speeds.values += speed
-        self.eastward_velocities.values = self.speeds.values * np.cos(np.deg2rad(self.directions.values) + np.pi / 2)
-        self.northward_velocities.values = self.speeds.values * np.sin(np.deg2rad(self.directions.values) + np.pi / 2)
         
 
 class Atmosphere:
@@ -196,7 +157,7 @@ class Atmosphere:
 
             print('Invalid model.')
 
-        self.wind = Wind(self.data)
+        self.wind = Velocity(self.data)
 
     def animate_field(self):
 
@@ -206,9 +167,11 @@ class Atmosphere:
         return plot.animate_field(lats, lons, times, u, v)
 
 
-class Wind:
+class Velocity:
 
-    def __init__(self, data):
+    def __init__(self, data, distribution=None):
+
+        self.distribution = distribution
 
         self.eastward_velocities = xr.DataArray(data=data.eastward_velocity.values,
                                                 coords=[('time', data.time.values),
@@ -245,8 +208,53 @@ class Wind:
         self.eastward_velocities.values = self.speeds.values * np.cos(np.deg2rad(self.directions.values) + np.pi / 2)
         self.northward_velocities.values = self.speeds.values * np.sin(np.deg2rad(self.directions.values) + np.pi / 2)
 
+    def sample(self, distribution_type='bivariate_normal', previous_sample=np.array([0, 0]), **kwargs):
+
+        if distribution_type == 'bivariate_normal':
+            alpha = kwargs.pop('alpha', 0.1)
+            new_sample = bivariate_normal(*self.distribution)
+            return previous_sample * (1 - alpha) + new_sample * alpha
+
+        else:
+
+            print('Invalid distribution type. Options are: bivariate_normal.')
+            return None
+
+
+class Interpolate:
+
+    def __init__(self, grid_vectors, *data, **kwargs):
+
+        self.data = data
+        self.grid_vectors = grid_vectors
+        self.reference_time = kwargs.pop('reference_time', np.datetime64('1950-01-01T00:00'))
+        self.time_units = kwargs.pop('time_units', 'h')
+        self.grid_info = get_grid_info(grid_vectors, **kwargs)
+        self.xarray_interp = kwargs.pop('xarray_interp', False)
+
+    def interpolate(self, point):
+
+        point_list = []
+
+        for p in point:
+            if isinstance(p, np.datetime64):
+                p = (p - self.reference_time) / np.timedelta64(1, self.time_units)
+            point_list.append(p)
+
+        point = tuple(point_list)
+
+        if self.xarray_interp:
+            values = []
+            for data in self.data:
+                values.append(data.interp(time=point[0], latitude=point[1], longitude=point[2], assume_sorted=True))
+            return tuple(values)
+
+        else:
+            return linear_interpolation_on_uniform_regular_grid(self.grid_info, point, *self.data)
+
 
 def fill_data_with_constant_value(data, **kwargs):
+
     for key, value in kwargs.items():
         data[key].values.fill(value)
 
@@ -329,36 +337,7 @@ def linear_interpolation_on_uniform_regular_grid(grid_info, point, *data):
         return data
 
 
-class Interpolate:
 
-    def __init__(self, grid_vectors, *data, **kwargs):
-
-        self.data = data
-        self.grid_vectors = grid_vectors
-        self.reference_time = kwargs.pop('reference_time', np.datetime64('1950-01-01T00:00'))
-        self.time_units = kwargs.pop('time_units', 'h')
-        self.grid_info = get_grid_info(grid_vectors, **kwargs)
-        self.xarray_interp = kwargs.pop('xarray_interp', False)
-
-    def interpolate(self, point):
-
-        point_list = []
-
-        for p in point:
-            if isinstance(p, np.datetime64):
-                p = (p - self.reference_time) / np.timedelta64(1, self.time_units)
-            point_list.append(p)
-
-        point = tuple(point_list)
-
-        if self.xarray_interp:
-            values = []
-            for data in self.data:
-                values.append(data.interp(time=point[0], latitude=point[1], longitude=point[2], assume_sorted=True))
-            return tuple(values)
-
-        else:
-            return linear_interpolation_on_uniform_regular_grid(self.grid_info, point, *self.data)
 
 
 def get_grid_info(grid_vectors, **kwargs):
