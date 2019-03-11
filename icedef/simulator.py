@@ -3,6 +3,7 @@
 
 import numpy as np
 import xarray as xr
+from astroML.stats import fit_bivariate_normal, bivariate_normal
 from copy import deepcopy
 from scipy.optimize import minimize, differential_evolution
 from icedef import iceberg, metocean, drift, tools, timesteppers, plot
@@ -166,6 +167,12 @@ class Simulator:
 
         self.results = Results(**{'map': kwargs.pop('map', plot.get_map())})
 
+    def add_current_distribution(self, distribution):
+        self.ocean.current.distribution = distribution
+
+    def add_wind_distribution(self, distribution):
+        self.atmosphere.wind.distribution = distribution
+
     def set_constant_current(self, constants):
         self.ocean = metocean.Ocean(self.time_frame, model=self.ocean_model, constants=constants)
 
@@ -291,6 +298,10 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
     ocean_model = kwargs.pop('ocean_model', 'ECMWF')
     atmosphere_model = kwargs.pop('atmosphere_model', 'NARR')
 
+    perturb_current = kwargs.pop('perturb_current', False)
+    perturb_wind = kwargs.pop('perturb_wind', False)
+    smoothing_constant = kwargs.pop('smoothing_constant', 0.01)
+
     start_time, end_time = time_frame
     dt = time_step.item().total_seconds()
     nt = int(np.timedelta64(end_time - start_time, 's').item().total_seconds() / dt)
@@ -339,7 +350,9 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
             'northward_wind': atmosphere.wind.northward_velocities,
             'log': kwargs.pop('log', None),
             'current_interpolator': ocean.current.interpolate,
-            'wind_interpolator': atmosphere.wind.interpolate
+            'wind_interpolator': atmosphere.wind.interpolate,
+            'current_sample': np.array([0, 0]),
+            'wind_sample': np.array([0, 0])
         }
 
     else:
@@ -355,7 +368,9 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
             'eastward_wind': atmosphere.wind.eastward_velocities,
             'northward_wind': atmosphere.wind.northward_velocities,
             'current_interpolator': ocean.current.interpolate,
-            'wind_interpolator': atmosphere.wind.interpolate
+            'wind_interpolator': atmosphere.wind.interpolate,
+            'current_sample': np.array([0, 0]),
+            'wind_sample': np.array([0, 0])
         }
 
     for i in range(nt):
@@ -363,6 +378,16 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
         times[i] = iceberg_.time
         results['latitude'][i] = iceberg_.latitude
         results['longitude'][i] = iceberg_.longitude
+
+        if perturb_current:
+            previous_current_sample = kwargs.get('current_sample')
+            new_current_sample = ocean.current.sample(previous_sample=previous_current_sample, alpha=smoothing_constant)
+            kwargs['current_sample'] = new_current_sample
+
+        if perturb_wind:
+            previous_wind_sample = kwargs.get('wind_sample')
+            new_wind_sample = atmosphere.wind.sample(previous_sample=previous_wind_sample, alpha=smoothing_constant)
+            kwargs['wind_sample'] = new_wind_sample
 
         if drift_model is drift.newtonian_drift_wrapper:
 
