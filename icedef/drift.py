@@ -28,15 +28,18 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
 
     fast_interpolation = kwargs.pop('fast_interpolation', True)
 
+    current_sample = kwargs.pop('current_sample', np.array([0, 0]))
+    wind_sample = kwargs.pop('wind_sample', np.array([0, 0]))
+
     if fast_interpolation:
 
         current_interpolator = kwargs.pop('current_interpolator')
-        Vcx, Vcy = current_interpolator((t, lat, lon))
+        Vcx, Vcy = current_interpolator((t, lat, lon)) + current_sample
         wind_interpolator = kwargs.pop('wind_interpolator')
-        Vwx, Vwy = wind_interpolator((t, lat, lon))
+        Vwx, Vwy = wind_interpolator((t, lat, lon)) + wind_sample
 
-        Vcx_left, Vcy_left = current_interpolator((t - dt, lat, lon))
-        Vcx_right, Vcy_right = current_interpolator((t + dt, lat, lon))
+        Vcx_left, Vcy_left = current_interpolator((t - dt, lat, lon)) + current_sample
+        Vcx_right, Vcy_right = current_interpolator((t + dt, lat, lon)) + current_sample
 
     else:
 
@@ -45,15 +48,15 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
         Vwxs = kwargs.pop('eastward_wind')
         Vwys = kwargs.pop('northward_wind')
 
-        Vcx = Vcxs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values
-        Vcy = Vcys.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values
-        Vwx = Vwxs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values
-        Vwy = Vwys.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values
+        Vcx = Vcxs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[0]
+        Vcy = Vcys.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[1]
+        Vwx = Vwxs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + wind_sample[0]
+        Vwy = Vwys.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + wind_sample[1]
 
-        Vcx_left = Vcxs.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values
-        Vcx_right = Vcxs.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values
-        Vcy_left = Vcys.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values
-        Vcy_right = Vcys.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values
+        Vcx_left = Vcxs.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[0]
+        Vcx_right = Vcxs.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[0]
+        Vcy_left = Vcys.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[1]
+        Vcy_right = Vcys.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[1]
 
     Amwx = (Vcx_right - Vcx_left) / (dt.item().total_seconds() * 2)
     Amwy = (Vcy_right - Vcy_left) / (dt.item().total_seconds() * 2)
@@ -272,13 +275,16 @@ def analytical_drift_wrapper(t, lon, lat, **kwargs):
 
     fast_interpolation = kwargs.pop('fast_interpolation', True)
 
+    current_sample = kwargs.pop('current_sample', np.array([0, 0]))
+    wind_sample = kwargs.pop('wind_sample', np.array([0, 0]))
+
     if fast_interpolation:
 
         current_interpolator = kwargs.pop('current_interpolator')
         wind_interpolator = kwargs.pop('wind_interpolator')
 
-        vwu, vwv = current_interpolator((t, lat, lon))
-        vau, vav = wind_interpolator((t, lat, lon))
+        vwu, vwv = current_interpolator((t, lat, lon)) + current_sample
+        vau, vav = wind_interpolator((t, lat, lon)) + wind_sample
 
     else:
 
@@ -287,10 +293,10 @@ def analytical_drift_wrapper(t, lon, lat, **kwargs):
         vaus = kwargs.pop('eastward_wind')
         vavs = kwargs.pop('northward_wind')
 
-        vwu = vwus.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values
-        vwv = vwvs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values
-        vau = vaus.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values
-        vav = vavs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values
+        vwu = vwus.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[0]
+        vwv = vwvs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[1]
+        vau = vaus.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + wind_sample[0]
+        vav = vavs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + wind_sample[1]
 
     kwargs['vwu'] = vwu
     kwargs['vwv'] = vwv
