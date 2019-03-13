@@ -38,8 +38,8 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
         wind_interpolator = kwargs.pop('wind_interpolator')
         Vwx, Vwy = wind_interpolator((t, lat, lon)) + wind_sample
 
-        Vcx_left, Vcy_left = current_interpolator((t - dt, lat, lon)) + current_sample
-        Vcx_right, Vcy_right = current_interpolator((t + dt, lat, lon)) + current_sample
+        Vcx_left, Vcy_left = current_interpolator((t - dt, lat, lon))
+        Vcx_right, Vcy_right = current_interpolator((t + dt, lat, lon))
 
     else:
 
@@ -175,8 +175,8 @@ def newtonian_drift(Vx, Vy, **kwargs):
     log = kwargs.pop('log', None)
 
     if log is not None:
-        log.info('{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}'.format(
-            Fax, Fay, Fwx, Fwy, Fcx, Fcy, Fwpx, Fwpy))
+        log.info('{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}'.format(
+            Fax, Fay, Fwx, Fwy, Fcx, Fcy, Fwpx, Fwpy, Vwx, Vwy, Vcx, Vcy, Amwx, Amwy))
 
     return ax, ay
 
