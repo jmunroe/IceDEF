@@ -3,70 +3,85 @@
 
 import numpy as np
 import xarray as xr
-from astroML.stats import fit_bivariate_normal, bivariate_normal
+from pandas import read_csv
 from copy import deepcopy
 from scipy.optimize import minimize, differential_evolution
-from icedef import iceberg, metocean, drift, tools, timesteppers, plot
+from icedef import iceberg, metocean, drift, tools, timesteppers, plot, log
 
-
-from logging import getLogger, FileHandler, DEBUG, Formatter
+from logging import getLogger, DEBUG
 from time import gmtime, strftime
-
-
-class DebugFileHandler(FileHandler):
-    """This class handles the debugging of iceberg simulations by writing the forces to file.
-    """
-    def __init__(self, filename='debug.log', mode='w', encoding=None, delay=False):
-        FileHandler.__init__(self, filename, mode, encoding, delay)
-        self.formatter = Formatter('%(message)s')
-        self.setFormatter(self.formatter)
 
 
 class Results:
 
-    def __init__(self, **kwargs):
+    def __init__(self):
 
-        self.map = kwargs.pop('map', plot.get_map())
+        self.map = None
         self.data = {}
 
-    def add(self, times, lats, lons, label='added', add_xy=True):
+    def add_map(self, map_=plot.get_map()):
+
+        self.map = map_
+
+    def add_dataset(self, dataset, label='added'):
 
         if label in self.data:
-            self.remove(label)
-
-        if add_xy:
-            eastings, northings = self.map_lonlat_to_xy(lons, lats)
-            results = {'latitude': lats, 'longitude': lons, 'easting': eastings, 'northing': northings}
-        else:
-            results = {'latitude': lats, 'longitude': lons}
-
-        xds = xr.Dataset()
-
-        for key, value in results.items():
-            xarr = xr.DataArray(data=value, coords=[times], dims=['time'])
-            xds[key] = xarr
-
-        self.data[label] = xds
-
-    def add_dataset(self, dataset, label='added', add_xy=True):
-
-        if label in self.data:
-            self.remove(label)
-
-        if add_xy:
-            times = dataset['latitude']['time'].values
-            lats = dataset['latitude'].values
-            lons = dataset['longitude'].values
-            self.add(times, lats, lons, label=label)
+            self.remove_dataset(label)
 
         else:
             self.data[label] = dataset
 
-    def remove(self, label):
+    def add_from_dict(self, data, label='added'):
+
+        time = data.pop('time')
+
+        xds = xr.Dataset()
+
+        for key, value in data.items():
+
+            xarr = xr.DataArray(data=value, coords=[time], dims=['time'])
+            xds[key] = xarr
+
+        self.data[label] = xds
+
+    def add_xy_to_existing_dataset(self, label):
+
+        xds = self.data[label]
+        lons = xds['longitude'].values
+        lats = xds['latitude'].values
+        eastings, northings = self.map_lonlat_to_xy(lons, lats)
+        data_dict = {'easting': eastings, 'northing': northings}
+        self.add_columns_to_existing_dataset(data_dict, label)
+
+    def add_columns_to_existing_dataset(self, data, label):
+
+        xds = self.data[label]
+        time = xds['time'].values
+
+        for key, value in data.items():
+
+            xarr = xr.DataArray(data=value, coords=[time], dims=['time'])
+            xds[key] = xarr
+
+        self.data[label] = xds
+
+    def add_columns_from_csv_to_existing_dataset(self, filename, column_names, label):
+
+        df = read_csv(filename, names=column_names)
+        self.add_columns_to_existing_dataset(df.to_dict(orient='list'), label)
+
+    def remove_dataset(self, label):
+
         del self.data[label]
 
     def map_lonlat_to_xy(self, lons, lats):
+
+        if self.map is None:
+
+            self.map = plot.get_map()
+
         xs, ys = self.map(lons, lats)
+
         return xs, ys
 
     def compute_distance_between_two_tracks(self, label1, label2, units='km'):
@@ -165,7 +180,7 @@ class Simulator:
         self.iceberg = iceberg.quickstart(self.time_frame[0], self.start_location, velocity=self.start_velocity,
                                           size=self.iceberg_size, shape=self.iceberg_shape)
 
-        self.results = Results(**{'map': kwargs.pop('map', plot.get_map())})
+        self.results = Results()
 
     def add_current_distribution(self, distribution):
         self.ocean.current.distribution = distribution
@@ -210,19 +225,21 @@ class Simulator:
 
         kwargs['iceberg'] = self.iceberg
 
-        log = getLogger('{}'.format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
-        file_handler = DebugFileHandler()
-        log.addHandler(file_handler)
-        log.setLevel(DEBUG)
+        debug_log = getLogger('{}'.format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+        file_handler = log.DebugFileHandler()
+        debug_log.addHandler(file_handler)
+        debug_log.setLevel(DEBUG)
 
-        kwargs['log'] = log
+        kwargs['log'] = debug_log
 
         results = run_simulation(self.time_frame, self.start_location, self.start_velocity, **kwargs)
 
-        del log
+        del debug_log
 
         if label is not None:
+
             self.results.add_dataset(results, label)
+
         else:
             return results
 
