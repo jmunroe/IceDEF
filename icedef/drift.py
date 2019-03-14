@@ -53,10 +53,10 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
         Vwx = Vwxs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + wind_sample[0]
         Vwy = Vwys.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + wind_sample[1]
 
-        Vcx_left = Vcxs.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[0]
-        Vcx_right = Vcxs.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[0]
-        Vcy_left = Vcys.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[1]
-        Vcy_right = Vcys.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[1]
+        Vcx_left = Vcxs.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values
+        Vcx_right = Vcxs.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values
+        Vcy_left = Vcys.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values
+        Vcy_right = Vcys.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values
 
     Amwx = (Vcx_right - Vcx_left) / (dt.item().total_seconds() * 2)
     Amwy = (Vcy_right - Vcy_left) / (dt.item().total_seconds() * 2)
@@ -175,8 +175,7 @@ def newtonian_drift(Vx, Vy, **kwargs):
     log = kwargs.pop('log', None)
 
     if log is not None:
-        log.info('{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f},{:.2f}'.format(
-            Fax, Fay, Fwx, Fwy, Fcx, Fcy, Fwpx, Fwpy, Vwx, Vwy, Vcx, Vcy, Amwx, Amwy))
+        log.info(f'{Fax},{Fay},{Fwx},{Fwy},{Fcx},{Fcy},{Fwpx},{Fwpy},{Vwx},{Vwy},{Vcx},{Vcy},{Amwx},{Amwy}')
 
     return ax, ay
 
