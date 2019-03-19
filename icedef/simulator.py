@@ -28,8 +28,7 @@ class Results:
         if label in self.data:
             self.remove_dataset(label)
 
-        else:
-            self.data[label] = dataset
+        self.data[label] = dataset
 
     def add_from_dict(self, data, label='added'):
 
@@ -317,7 +316,7 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
 
     perturb_current = kwargs.pop('perturb_current', False)
     perturb_wind = kwargs.pop('perturb_wind', False)
-    smoothing_constant = kwargs.pop('smoothing_constant', 0.01)
+    smoothing_constant = kwargs.pop('smoothing_constant', 0.5)
 
     start_time, end_time = time_frame
     dt = time_step.item().total_seconds()
@@ -390,6 +389,12 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
             'wind_sample': np.array([0, 0])
         }
 
+    current_correction_samples = read_csv('/home/evankielley/current_correction_samples.csv')
+    current_correction_samples = current_correction_samples.drop(columns='Unnamed: 0')
+
+    wind_correction_samples = read_csv('/home/evankielley/wind_correction_samples.csv')
+    wind_correction_samples = wind_correction_samples.drop(columns='Unnamed: 0')
+
     for i in range(nt):
 
         times[i] = iceberg_.time
@@ -398,12 +403,16 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
 
         if perturb_current:
             previous_current_sample = kwargs.get('current_sample')
-            new_current_sample = ocean.current.sample(previous_sample=previous_current_sample, alpha=smoothing_constant)
+            current_correction_sample = -1 * current_correction_samples.iloc[np.random.randint(0, len(current_correction_samples))].values
+            new_current_sample = previous_current_sample * (1 - smoothing_constant) + current_correction_sample * smoothing_constant
+            # new_current_sample = ocean.current.sample(previous_sample=previous_current_sample, alpha=smoothing_constant)
             kwargs['current_sample'] = new_current_sample
 
         if perturb_wind:
             previous_wind_sample = kwargs.get('wind_sample')
-            new_wind_sample = atmosphere.wind.sample(previous_sample=previous_wind_sample, alpha=smoothing_constant)
+            wind_correction_sample = -1 * wind_correction_samples.iloc[np.random.randint(0, len(wind_correction_samples))].values
+            new_wind_sample = previous_wind_sample * (1 - smoothing_constant) + wind_correction_sample * smoothing_constant
+            # new_wind_sample = atmosphere.wind.sample(previous_sample=previous_wind_sample, alpha=smoothing_constant)
             kwargs['wind_sample'] = new_wind_sample
 
         if drift_model is drift.newtonian_drift_wrapper:
