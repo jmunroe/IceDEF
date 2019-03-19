@@ -130,6 +130,9 @@ def plot_track(*latlons, **kwargs):
     new_map_kwargs = get_map_kwargs(min_lat, min_lon, max_lat, max_lon, **map_kwargs)
     map_kwargs.update(new_map_kwargs)
 
+    line_plot = kwargs.pop('line_plot', False)
+    plot_kwargs = kwargs.pop('plot_kwargs', {})
+
     map_ = get_map(**map_kwargs)
     map_ = draw_map(map_, **map_kwargs)
 
@@ -164,7 +167,10 @@ def plot_track(*latlons, **kwargs):
 
         lats, lons = latlon
         eastings, northings = map_(lons, lats)
-        ax.scatter(eastings, northings, label=labels[i], marker=markers[i], s=sizes[i], **scatter_kwargs)
+        if line_plot:
+            ax.plot(eastings, northings, label=labels[i], **plot_kwargs)
+        else:
+            ax.scatter(eastings, northings, label=labels[i], marker=markers[i], s=sizes[i], **scatter_kwargs)
         i += 1
 
     vectors = kwargs.pop('vectors', None)
@@ -224,7 +230,7 @@ def get_map_kwargs(min_lat, min_lon, max_lat, max_lon, **kwargs):
 
     if isinstance(pads, int) or isinstance(pads, float):
         pads = [pads] * 4
-        
+
     min_lat_padded = min_lat - pads[1]
     max_lat_padded = max_lat + pads[3]
     min_lon_padded = min_lon - pads[2]
