@@ -34,7 +34,9 @@ class TestCaseA(TestCase):
     END_TIME = np.datetime64('2015-05-07T06:25:51')
     BEACON_ID = '90679'
 
-    def __init__(self):
+    def __init__(self, add_timedelta=np.timedelta64(0, 'D')):
+        self.START_TIME += add_timedelta
+        self.END_TIME = self.START_TIME + np.timedelta64(1, 'D')
         super().__init__(beacon_id=self.BEACON_ID, start_time=self.START_TIME, end_time=self.END_TIME)
 
 
@@ -44,5 +46,7 @@ class TestCaseB(TestCase):
     END_TIME = START_TIME + np.timedelta64(1, 'D')
     BEACON_ID = '20498'
 
-    def __init__(self):
+    def __init__(self, add_timedelta=np.timedelta64(0, 'D')):
+        self.START_TIME += add_timedelta
+        self.END_TIME = self.START_TIME + np.timedelta64(1, 'D')
         super().__init__(beacon_id=self.BEACON_ID, start_time=self.START_TIME, end_time=self.END_TIME)
