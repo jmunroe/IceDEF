@@ -66,6 +66,9 @@ def get_temporal_subset_df(df, time_column_name='time', start_time=None, end_tim
     if start_time is None:
         start_time = df[time_column_name].values[0]
 
+    elif type(start_time) is np.timedelta64:
+        start_time = df[time_column_name].values[0] + start_time
+        
     if end_time is None:
         end_time = df[time_column_name].values[len(df) - 1]
 
