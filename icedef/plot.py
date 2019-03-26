@@ -141,27 +141,27 @@ def plot_track(*latlons, **kwargs):
 
     if labels is not None:
         show_legend = True
-        quiver_kwargs['label'] = [''] * 100
+        quiver_kwargs['label'] = [''] * len(latlons)
 
     elif quiver_labels is not None:
         show_legend = True
-        labels = [''] * 100
+        labels = [''] * len(latlons)
 
     else:
         show_legend = False
-        labels = [''] * 100
-        quiver_kwargs['label'] = [''] * 100
+        labels = [''] * len(latlons)
+        quiver_kwargs['label'] = [''] * len(latlons)
 
     i = 0
 
-    sizes = kwargs.pop('sizes', [1] * 100)
-    markers = kwargs.pop('markers', [None] * 100)
+    sizes = kwargs.pop('sizes', [1] * len(latlons))
+    markers = kwargs.pop('markers', [None] * len(latlons))
 
     if isinstance(sizes, int):
-        sizes = [sizes] * 100
+        sizes = [sizes] * len(latlons)
 
     if isinstance(markers, int):
-        markers = [markers] * 100
+        markers = [markers] * len(latlons)
 
     for latlon in latlons:
 

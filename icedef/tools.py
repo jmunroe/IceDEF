@@ -61,6 +61,14 @@ def compute_mse(simulation_point, observation_vectors, reference_time):
     return mse
 
 
+def subset_ds(ds, bounds_by_colname):
+
+    for colname, bounds in bounds_by_colname.items():
+        ds = ds.where((ds[colname] >= bounds[0]) & (ds[colname] <= bounds[1]), drop=True)
+
+    return ds
+
+
 def get_temporal_subset_df(df, time_column_name='time', start_time=None, end_time=None):
 
     if start_time is None:

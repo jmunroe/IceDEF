@@ -159,7 +159,6 @@ class Simulator:
             iceberg_size (str or tuple of float): size class for the iceberg or dims (waterline length, sail height).
             iceberg_shape (str): shape class for the iceberg.
         """
-
         self.start_location = start_location
         self.time_frame = time_frame
         self.start_velocity = start_velocity
@@ -179,6 +178,7 @@ class Simulator:
         self.iceberg = iceberg.quickstart(self.time_frame[0], self.start_location, velocity=self.start_velocity,
                                           size=self.iceberg_size, shape=self.iceberg_shape)
 
+        self.testcase = None
         self.results = Results()
 
     def add_current_distribution(self, distribution):
@@ -224,7 +224,9 @@ class Simulator:
 
         kwargs['iceberg'] = self.iceberg
 
-        debug_log = getLogger('{}'.format(strftime("%Y-%m-%d %H:%M:%S", gmtime())))
+        kwargs['testcase'] = self.testcase
+
+        debug_log = getLogger('{}'.format(strftime("%Y-%m-%d %H:%M:%S.%f", gmtime())))
         file_handler = log.DebugFileHandler()
         debug_log.addHandler(file_handler)
         debug_log.setLevel(DEBUG)
@@ -233,11 +235,14 @@ class Simulator:
 
         results = run_simulation(self.time_frame, self.start_location, self.start_velocity, **kwargs)
 
-        del debug_log
+        debug_log.handlers[0].stream.close()
+        debug_log.removeHandler(debug_log.handlers[0])
 
         if label is not None:
 
             self.results.add_dataset(results, label)
+            self.results.add_columns_from_csv_to_existing_dataset('./debug.log',
+               ['Fax','Fay','Fwx','Fwy','Fcx','Fcy','Fwpx','Fwpy','Vwx','Vwy','Vcx','Vcy','Amwx','Amwy'], label)
 
         else:
             return results
@@ -334,8 +339,15 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
     current_constants = kwargs.pop('current_constants', None)
     wind_constants = kwargs.pop('wind_constants', None)
 
-    ocean = kwargs.pop('ocean', metocean.Ocean(time_frame, model=ocean_model, constants=current_constants))
-    atmosphere = kwargs.pop('atmosphere', metocean.Atmosphere(time_frame, model=atmosphere_model, constants=wind_constants))
+    ocean = kwargs.pop('ocean', None)
+    atmosphere = kwargs.pop('atmosphere', None)
+
+    if not ocean:
+        ocean = metocean.Ocean(time_frame, model=ocean_model, constants=current_constants)
+    if not atmosphere:
+        atmosphere = metocean.Atmosphere(time_frame, model=atmosphere_model, constants=wind_constants)
+
+    testcase = kwargs.pop('testcase', None)
 
     # Initialize arrays
     times = np.zeros(nt, dtype='datetime64[ns]')
@@ -368,7 +380,9 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
             'current_interpolator': ocean.current.interpolate,
             'wind_interpolator': atmosphere.wind.interpolate,
             'current_sample': np.array([0, 0]),
-            'wind_sample': np.array([0, 0])
+            'wind_sample': np.array([0, 0]),
+            'previous_current_sample': np.array([0, 0]),
+            'previous_wind_sample': np.array([0, 0]),
         }
 
     else:
@@ -389,11 +403,11 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
             'wind_sample': np.array([0, 0])
         }
 
-    current_correction_samples = read_csv('/home/evankielley/current_correction_samples.csv')
-    current_correction_samples = current_correction_samples.drop(columns='Unnamed: 0')
+    #current_correction_samples = read_csv('/home/evankielley/current_correction_samples.csv')
+    #current_correction_samples = current_correction_samples.drop(columns='Unnamed: 0')
 
-    wind_correction_samples = read_csv('/home/evankielley/wind_correction_samples.csv')
-    wind_correction_samples = wind_correction_samples.drop(columns='Unnamed: 0')
+    #wind_correction_samples = read_csv('/home/evankielley/wind_correction_samples.csv')
+    #wind_correction_samples = wind_correction_samples.drop(columns='Unnamed: 0')
 
     for i in range(nt):
 
@@ -403,17 +417,21 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
 
         if perturb_current:
             previous_current_sample = kwargs.get('current_sample')
-            current_correction_sample = -1 * current_correction_samples.iloc[np.random.randint(0, len(current_correction_samples))].values
+            #current_correction_sample = -1 * current_correction_samples.iloc[np.random.randint(0, len(current_correction_samples))].values
+            current_correction_sample = testcase.sample_current_distribution()
             new_current_sample = previous_current_sample * (1 - smoothing_constant) + current_correction_sample * smoothing_constant
             # new_current_sample = ocean.current.sample(previous_sample=previous_current_sample, alpha=smoothing_constant)
             kwargs['current_sample'] = new_current_sample
+            kwargs['previous_current_sample'] = previous_current_sample
 
         if perturb_wind:
             previous_wind_sample = kwargs.get('wind_sample')
-            wind_correction_sample = -1 * wind_correction_samples.iloc[np.random.randint(0, len(wind_correction_samples))].values
+            #wind_correction_sample = -1 * wind_correction_samples.iloc[np.random.randint(0, len(wind_correction_samples))].values
+            wind_correction_sample = testcase.sample_wind_distribution()
             new_wind_sample = previous_wind_sample * (1 - smoothing_constant) + wind_correction_sample * smoothing_constant
             # new_wind_sample = atmosphere.wind.sample(previous_sample=previous_wind_sample, alpha=smoothing_constant)
             kwargs['wind_sample'] = new_wind_sample
+            kwargs['previous_wind_sample'] = previous_wind_sample
 
         if drift_model is drift.newtonian_drift_wrapper:
 

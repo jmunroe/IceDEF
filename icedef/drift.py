@@ -29,7 +29,10 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
     fast_interpolation = kwargs.pop('fast_interpolation', True)
 
     current_sample = kwargs.pop('current_sample', np.array([0, 0]))
+    previous_current_sample = kwargs.pop('previous_current_sample', np.array([0, 0]))
     wind_sample = kwargs.pop('wind_sample', np.array([0, 0]))
+    previous_wind_sample = kwargs.pop('previous_current_sample', np.array([0, 0]))
+
 
     if fast_interpolation:
 
@@ -40,6 +43,8 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
 
         Vcx_left, Vcy_left = current_interpolator((t - dt, lat, lon))
         Vcx_right, Vcy_right = current_interpolator((t + dt, lat, lon))
+
+        #previous_Vcx, previous_Vcy = current_interpolator((t - dt, lat, lon)) + previous_current_sample
 
     else:
 
@@ -58,8 +63,16 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
         Vcy_left = Vcys.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values
         Vcy_right = Vcys.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values
 
+        #previous_Vcx = Vcxs.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values + previous_current_sample[0]
+        #previous_Vcy = Vcys.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values + previous_current_sample[1]
+
+        #
+
     Amwx = (Vcx_right - Vcx_left) / (dt.item().total_seconds() * 2)
     Amwy = (Vcy_right - Vcy_left) / (dt.item().total_seconds() * 2)
+
+    #Amwx = (Vcx - previous_Vcx) / (dt.item().total_seconds())
+    #Amwy = (Vcy - previous_Vcy) / (dt.item().total_seconds())
 
     kwargs['Vcx'] = Vcx
     kwargs['Vcy'] = Vcy
@@ -67,6 +80,8 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
     kwargs['Vwy'] = Vwy
     kwargs['Amwx'] = Amwx
     kwargs['Amwy'] = Amwy
+    kwargs['Vmwx'] = Vcx #(Vcx + previous_Vcx) / 2
+    kwargs['Vmwy'] = Vcy #(Vcy + previous_Vcy) / 2
 
     kwargs['phi'] = lat
 
@@ -100,6 +115,8 @@ def newtonian_drift(Vx, Vy, **kwargs):
 
     Amwx = kwargs.pop('Amwx', 0)
     Amwy = kwargs.pop('Amwy', 0)
+    Vmwx = kwargs.pop('Vmwx', Vcx)
+    Vmwy = kwargs.pop('Vmwy', Vcy)
 
     Ca = kwargs.pop('form_drag_coefficient_in_air', 1.5)
     Cw = kwargs.pop('form_drag_coefficient_in_water', 1.5)
@@ -161,8 +178,8 @@ def newtonian_drift(Vx, Vy, **kwargs):
     Fcy = -f * M * Vx
 
     # Water Pressure Gradient Force
-    Vmwx = Vcx
-    Vmwy = Vcy
+    Vmwx = Vmwx
+    Vmwy = Vmwy
     Amwx = Amwx
     Amwy = Amwy
     Fwpx = M * (Amwx - f * Vmwy)

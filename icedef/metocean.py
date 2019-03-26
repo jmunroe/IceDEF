@@ -98,6 +98,7 @@ class Ocean:
             print('Invalid model.')
 
         self.current = Velocity(self.data)
+        self.data.close()
 
     def animate_field(self):
 
@@ -143,7 +144,6 @@ class Atmosphere:
                  'northward_wind': 'northward_velocity'})
 
         elif model == 'NARR':
-
             self.ID = "NCEP_North_American_Regional_Reanalysis_NARR"
             self.PATH = 'http://icedef.munroelab.ca/data/NARR/atm/daily/'
             self.data = xr.open_mfdataset(get_files(self.ID, self.PATH, date_bounds)).rename(
@@ -158,6 +158,7 @@ class Atmosphere:
             print('Invalid model.')
 
         self.wind = Velocity(self.data)
+        self.data.close()
 
     def animate_field(self):
 
@@ -172,7 +173,6 @@ class Velocity:
     def __init__(self, data, distribution=None):
 
         self.distribution = distribution
-
         self.eastward_velocities = xr.DataArray(data=data.eastward_velocity.values,
                                                 coords=[('time', data.time.values),
                                                         ('latitude', data.latitude.values),
