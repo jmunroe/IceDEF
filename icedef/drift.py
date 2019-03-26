@@ -29,8 +29,10 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
     fast_interpolation = kwargs.pop('fast_interpolation', True)
 
     current_sample = kwargs.pop('current_sample', np.array([0, 0]))
+    #current_sample = np.array([0.03, -0.01])
     previous_current_sample = kwargs.pop('previous_current_sample', np.array([0, 0]))
     wind_sample = kwargs.pop('wind_sample', np.array([0, 0]))
+    #wind_sample = np.array([-5.08, -3.39])
     previous_wind_sample = kwargs.pop('previous_current_sample', np.array([0, 0]))
 
 

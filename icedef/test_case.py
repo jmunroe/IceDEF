@@ -171,12 +171,12 @@ class TestCaseA(TestCase):
 class TestCaseB(TestCase):
 
     START_TIME = np.datetime64('2015-04-24T22:53:29')
-    END_TIME = START_TIME + np.timedelta64(2, 'D')
+    END_TIME = START_TIME + np.timedelta64(3, 'D')
     BEACON_ID = '20498'
 
     def __init__(self, add_timedelta=np.timedelta64(0, 'D')):
         self.START_TIME += add_timedelta
-        self.END_TIME = self.START_TIME + np.timedelta64(2, 'D')
+        self.END_TIME = self.START_TIME + np.timedelta64(3, 'D')
         super().__init__(beacon_id=self.BEACON_ID, start_time=self.START_TIME, end_time=self.END_TIME)
 
 
