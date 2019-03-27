@@ -349,6 +349,11 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
 
     testcase = kwargs.pop('testcase', None)
 
+    Ca = kwargs.pop('Ca', iceberg_.FORM_DRAG_COEFFICIENT_IN_AIR)
+    Cw = kwargs.pop('Cw', iceberg_.FORM_DRAG_COEFFICIENT_IN_WATER)
+    percent_to_perturb_Ca_by = kwargs.pop('percent_to_perturb_Ca_by', 0)
+    percent_to_perturb_Cw_by = kwargs.pop('percent_to_perturb_Cw_by', 0)
+
     # Initialize arrays
     times = np.zeros(nt, dtype='datetime64[ns]')
 
@@ -359,8 +364,8 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
                    'iceberg_eastward_velocity': np.zeros(nt),
                    'iceberg_northward_velocity': np.zeros(nt)}
         kwargs = {
-            'form_drag_coefficient_in_air': kwargs.pop('Ca', iceberg_.FORM_DRAG_COEFFICIENT_IN_AIR),
-            'form_drag_coefficient_in_water': kwargs.pop('Cw', iceberg_.FORM_DRAG_COEFFICIENT_IN_WATER),
+            'form_drag_coefficient_in_air': Ca,
+            'form_drag_coefficient_in_water': Cw,
             'skin_drag_coefficient_in_air': iceberg_.SKIN_DRAG_COEFFICIENT_IN_AIR,
             'skin_drag_coefficient_in_water': iceberg_.SKIN_DRAG_COEFFICIENT_IN_WATER,
             'sail_area': iceberg_.geometry.sail_area,
@@ -432,6 +437,14 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
             # new_wind_sample = atmosphere.wind.sample(previous_sample=previous_wind_sample, alpha=smoothing_constant)
             kwargs['wind_sample'] = new_wind_sample
             kwargs['previous_wind_sample'] = previous_wind_sample
+
+        if percent_to_perturb_Ca_by:
+            percentage = percent_to_perturb_Ca_by
+            kwargs['form_drag_coefficient_in_air'] = Ca + Ca * float(np.random.randint(-percentage, percentage, 1) / 100)
+
+        if percent_to_perturb_Cw_by:
+            percentage = percent_to_perturb_Cw_by
+            kwargs['form_drag_coefficient_in_water'] = Cw + Cw * float(np.random.randint(-percentage, percentage, 1) / 100)
 
         if drift_model is drift.newtonian_drift_wrapper:
 

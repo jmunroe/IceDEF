@@ -204,9 +204,21 @@ class TestCaseB12(TestCase):
         super().__init__(beacon_id=self.BEACON_ID, start_time=self.START_TIME, end_time=self.END_TIME)
 
 
+class TestCaseB24(TestCase):
+
+    START_TIME = np.datetime64('2015-04-24T22:53:29')
+    END_TIME = START_TIME + np.timedelta64(24, 'D')
+    BEACON_ID = '20498'
+
+    def __init__(self, add_timedelta=np.timedelta64(0, 'D')):
+        self.START_TIME += add_timedelta
+        self.END_TIME = self.START_TIME + np.timedelta64(24, 'h')
+        super().__init__(beacon_id=self.BEACON_ID, start_time=self.START_TIME, end_time=self.END_TIME)
+
+
 class TestCaseC(TestCase):
 
-    START_TIME = np.datetime64('2015-04-29') #np.datetime64('2015-04-24T15:16:06') # np.datetime64('2015-04-23T18:48:37')
+    START_TIME = np.datetime64('2015-04-23T18:48:37') #np.datetime64('2015-04-29') #np.datetime64('2015-04-24T15:16:06') #
     END_TIME = START_TIME + np.timedelta64(3, 'D')
     BEACON_ID = '50519'
 
@@ -218,7 +230,7 @@ class TestCaseC(TestCase):
 
 class TestCaseC6(TestCase):
 
-    START_TIME = np.datetime64('2015-04-29') #np.datetime64('2015-04-24T15:16:06') # np.datetime64('2015-04-23T18:48:37')
+    START_TIME = np.datetime64('2015-04-23T18:48:37') #np.datetime64('2015-04-29') #np.datetime64('2015-04-24T15:16:06') #
     END_TIME = START_TIME + np.timedelta64(6, 'h')
     BEACON_ID = '50519'
 
@@ -230,7 +242,7 @@ class TestCaseC6(TestCase):
 
 class TestCaseC12(TestCase):
 
-    START_TIME = np.datetime64('2015-04-29') #np.datetime64('2015-04-24T15:16:06') # np.datetime64('2015-04-23T18:48:37')
+    START_TIME = np.datetime64('2015-04-23T18:48:37') #np.datetime64('2015-04-29') #np.datetime64('2015-04-24T15:16:06') #
     END_TIME = START_TIME + np.timedelta64(12, 'h')
     BEACON_ID = '50519'
 
