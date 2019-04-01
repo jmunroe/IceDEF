@@ -18,7 +18,7 @@ avos_data_path = root_dir_path + 'AVOS_2015.csv'
 adcp_data_path = root_dir_path + 'Leg1_1501_ADCP/an1501_os150bb.nc'
 
 
-def get_beacon_df(path=sample_beacon_data_path, start_time=None, end_time=None):
+def get_beacon_df(path=sample_beacon_data_path, beacon_id=None, start_time=None, end_time=None):
     """This function returns a pandas data frame of the beacon data at the specified path.
 
     Args:
@@ -29,7 +29,8 @@ def get_beacon_df(path=sample_beacon_data_path, start_time=None, end_time=None):
     Returns:
         df (pandas.core.frame.DataFrame): data frame requested.
     """
-
+    if beacon_id:
+        path = beacon_dir_path + f'0{beacon_id}0_2015.csv'
     t_col_name = 'DataDate_UTC'
     df = pd.read_csv(path)
     df.loc[:, t_col_name] = pd.to_datetime(df[t_col_name])
