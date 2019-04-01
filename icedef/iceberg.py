@@ -43,22 +43,44 @@ class IcebergGeometry:
         if isinstance(size, (tuple, list, np.ndarray)):
             self.custom_waterline_length, self.custom_sail_height = size
             self._size = 'CUSTOM'
-        else:
+
+        elif isinstance(size, str):
             self._size = size
+
+        else:
+            self._size = None
 
         if isinstance(shape, (tuple, list, np.ndarray)):
             self.custom_height_to_draft_ratio, self.custom_shape_factor = shape
             self._shape = 'CUSTOM'
-        else:
+
+        elif isinstance(shape, str):
             self._shape = shape
+
+        else:
+            self._shape = None
+
+        self._waterline_length = None
+        self._sail_height = None
+        self._mass = None
 
     @property
     def waterline_length(self):
         """Return the mean waterline length for the size declared."""
         if self._size == 'CUSTOM':
-            return self.custom_waterline_length
+            self._waterline_length = self.custom_waterline_length
+            return self._waterline_length
+
+        elif self._size is None:
+            return self._waterline_length
+
         else:
-            return np.mean(WATERLINE_LENGTH_RANGE_BY_SIZE[self._size])
+            self._waterline_length = np.mean(WATERLINE_LENGTH_RANGE_BY_SIZE[self._size])
+            return self._waterline_length
+
+    @waterline_length.setter
+    def waterline_length(self,  value):
+        self._waterline_length = value
 
     @property
     def top_area(self):
@@ -74,9 +96,19 @@ class IcebergGeometry:
     def sail_height(self):
         """Return the mean sail height for the size declared."""
         if self._size == 'CUSTOM':
-            return self.custom_sail_height
+            self._sail_height = self.custom_sail_height
+            return self._sail_height
+
+        elif self._size is None:
+            return self._sail_height
+
         else:
-            return np.mean(SAIL_HEIGHT_RANGE_BY_SIZE[self._size])
+            self._sail_height = np.mean(SAIL_HEIGHT_RANGE_BY_SIZE[self._size])
+            return self._sail_height
+
+    @sail_height.setter
+    def sail_height(self, value):
+        self._sail_height = value
 
     @property
     def sail_area(self):
@@ -109,10 +141,18 @@ class IcebergGeometry:
     @property
     def mass(self):
         """Return the mass using formula from Rudkin, 2005."""
-        factor = self.shape_factor
-        length = self.waterline_length
-        height = self.sail_height
-        return 7.12e3 * factor * length**2 * height
+        if self._size is None:
+            return self._mass
+        else:
+            factor = self.shape_factor
+            length = self.waterline_length
+            height = self.sail_height
+            self._mass = 7.12e3 * factor * length**2 * height
+            return self._mass
+
+    @mass.setter
+    def mass(self, value):
+        self._mass = value
 
     @property
     def keel_area(self):
