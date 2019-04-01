@@ -421,22 +421,38 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
         results['longitude'][i] = iceberg_.longitude
 
         if perturb_current:
-            previous_current_sample = kwargs.get('current_sample')
-            #current_correction_sample = -1 * current_correction_samples.iloc[np.random.randint(0, len(current_correction_samples))].values
-            current_correction_sample = testcase.sample_current_distribution()
-            new_current_sample = previous_current_sample * (1 - smoothing_constant) + current_correction_sample * smoothing_constant
-            # new_current_sample = ocean.current.sample(previous_sample=previous_current_sample, alpha=smoothing_constant)
-            kwargs['current_sample'] = new_current_sample
-            kwargs['previous_current_sample'] = previous_current_sample
+
+            if current_constants:
+
+                kwargs['previous_current_sample'] = kwargs.get('current_sample')
+                kwargs['current_sample'] = current_constants
+
+            else:
+
+                previous_current_sample = kwargs.get('current_sample')
+                #current_correction_sample = -1 * current_correction_samples.iloc[np.random.randint(0, len(current_correction_samples))].values
+                current_correction_sample = testcase.sample_current_distribution()
+                new_current_sample = previous_current_sample * (1 - smoothing_constant) + current_correction_sample * smoothing_constant
+                # new_current_sample = ocean.current.sample(previous_sample=previous_current_sample, alpha=smoothing_constant)
+                kwargs['current_sample'] = new_current_sample
+                kwargs['previous_current_sample'] = previous_current_sample
 
         if perturb_wind:
-            previous_wind_sample = kwargs.get('wind_sample')
-            #wind_correction_sample = -1 * wind_correction_samples.iloc[np.random.randint(0, len(wind_correction_samples))].values
-            wind_correction_sample = testcase.sample_wind_distribution()
-            new_wind_sample = previous_wind_sample * (1 - smoothing_constant) + wind_correction_sample * smoothing_constant
-            # new_wind_sample = atmosphere.wind.sample(previous_sample=previous_wind_sample, alpha=smoothing_constant)
-            kwargs['wind_sample'] = new_wind_sample
-            kwargs['previous_wind_sample'] = previous_wind_sample
+
+            if wind_constants:
+
+                kwargs['previous_wind_sample'] = kwargs.get('wind_sample')
+                kwargs['wind_sample'] = wind_constants
+
+            else:
+
+                previous_wind_sample = kwargs.get('wind_sample')
+                #wind_correction_sample = -1 * wind_correction_samples.iloc[np.random.randint(0, len(wind_correction_samples))].values
+                wind_correction_sample = testcase.sample_wind_distribution()
+                new_wind_sample = previous_wind_sample * (1 - smoothing_constant) + wind_correction_sample * smoothing_constant
+                # new_wind_sample = atmosphere.wind.sample(previous_sample=previous_wind_sample, alpha=smoothing_constant)
+                kwargs['wind_sample'] = new_wind_sample
+                kwargs['previous_wind_sample'] = previous_wind_sample
 
         if percent_to_perturb_Ca_by:
             percentage = percent_to_perturb_Ca_by
