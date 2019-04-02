@@ -197,9 +197,10 @@ class Velocity:
                                                ('latitude', data.latitude.values),
                                                ('longitude', data.longitude.values)])
 
-        self.interpolate = Interpolate((data.time.values, data.latitude.values, data.longitude.values),
-                                       self.eastward_velocities.values,
-                                       self.northward_velocities.values).interpolate
+        self.interpolator = Interpolate((data.time.values, data.latitude.values, data.longitude.values),
+                                        self.eastward_velocities.values, self.northward_velocities.values)
+
+        self.interpolate = self.interpolator.interpolate
 
     def offset(self, speed=0, angle=0):
 
@@ -232,7 +233,7 @@ class Interpolate:
         self.grid_info = get_grid_info(grid_vectors, **kwargs)
         self.xarray_interp = kwargs.pop('xarray_interp', False)
 
-    def interpolate(self, point):
+    def interpolate(self, point, xarray_interp=False):
 
         point_list = []
 
@@ -244,6 +245,9 @@ class Interpolate:
         point = tuple(point_list)
 
         if self.xarray_interp:
+            xarray_interp = True
+
+        if xarray_interp:
             values = []
             for data in self.data:
                 values.append(data.interp(time=point[0], latitude=point[1], longitude=point[2], assume_sorted=True))
@@ -251,6 +255,60 @@ class Interpolate:
 
         else:
             return linear_interpolation_on_uniform_regular_grid(self.grid_info, point, *self.data)
+
+
+def linear_interpolation_on_uniform_regular_grid(grid_info, point, *data):
+
+    data_list = [None] * len(data)
+
+    for dim in range(len(point)):
+
+        x0, dx, xn = grid_info[dim]
+        xi = point[dim]
+
+        try:
+            assert x0 <= xi <= xn, f'Point out of range in dim {dim} ({xi} is not in ({x0}, {xn})).'
+        except TypeError as e:
+            print(e, f'(in dim {dim}: x0 = {x0}, xi = {xi}, and xn = {xn})')
+
+        index = (xi - x0) / dx
+        index_floor = int(np.floor(index))
+        index_diff = index - index_floor
+
+        for i, data_ in enumerate(data):
+            data_slice = data_[index_floor: index_floor + 2, ...]
+            data_list[i] = (1 - index_diff) * data_slice[0, ...] + index_diff * data_slice[1, ...]
+
+        data = np.array(data_list)
+
+    if len(data) == 1:
+        return data[0]
+
+    else:
+        return data
+
+
+def get_grid_info(grid_vectors, **kwargs):
+
+    reference_time = kwargs.pop('reference_time', np.datetime64('1950-01-01T00:00'))
+    time_units = kwargs.pop('time_units', 'h')
+
+    grid_info = []
+
+    for grid_vector in grid_vectors:
+
+        if isinstance(grid_vector, xr.core.dataarray.DataArray):
+            grid_vector = grid_vector.values
+
+        if isinstance(grid_vector[0], np.datetime64):
+            grid_vector = (grid_vector - reference_time) / np.timedelta64(1, time_units)
+
+        grid_vector_min = np.min(grid_vector[0])
+        grid_vector_max = np.max(grid_vector[-1])
+        grid_vector_step = np.mean(np.diff(grid_vector))
+        grid_info.append([grid_vector_min, grid_vector_step, grid_vector_max])
+
+    return grid_info
 
 
 def fill_data_with_constant_value(data, **kwargs):
@@ -304,63 +362,6 @@ def get_files(id_, path, date_bounds, cache=True):
             print('done.')
 
     return files
-
-
-def linear_interpolation_on_uniform_regular_grid(grid_info, point, *data):
-
-    data_list = [None] * len(data)
-
-    for dim in range(len(point)):
-
-        x0, dx, xn = grid_info[dim]
-        xi = point[dim]
-
-        try:
-            assert x0 <= xi <= xn, f'Point out of range in dim {dim} ({xi} is not in ({x0}, {xn})).'
-        except TypeError as e:
-            print(e, f'(in dim {dim}: x0 = {x0}, xi = {xi}, and xn = {xn})')
-
-        index = (xi - x0) / dx
-        index_floor = int(np.floor(index))
-        index_diff = index - index_floor
-
-        for i, data_ in enumerate(data):
-            data_slice = data_[index_floor: index_floor + 2, ...]
-            data_list[i] = (1 - index_diff) * data_slice[0, ...] + index_diff * data_slice[1, ...]
-
-        data = tuple(data_list)
-
-    if len(data) == 1:
-        return data[0]
-
-    else:
-        return data
-
-
-
-
-
-def get_grid_info(grid_vectors, **kwargs):
-
-    reference_time = kwargs.pop('reference_time', np.datetime64('1950-01-01T00:00'))
-    time_units = kwargs.pop('time_units', 'h')
-
-    grid_info = []
-
-    for grid_vector in grid_vectors:
-
-        if isinstance(grid_vector, xr.core.dataarray.DataArray):
-            grid_vector = grid_vector.values
-
-        if isinstance(grid_vector[0], np.datetime64):
-            grid_vector = (grid_vector - reference_time) / np.timedelta64(1, time_units)
-
-        grid_vector_min = np.min(grid_vector[0])
-        grid_vector_max = np.max(grid_vector[-1])
-        grid_vector_step = np.mean(np.diff(grid_vector))
-        grid_info.append([grid_vector_min, grid_vector_step, grid_vector_max])
-
-    return grid_info
 
 
 def compute_magnitude(eastward_component, northward_component):
