@@ -2,6 +2,7 @@ cache/
 bin/
 csvs/
 papers/
+notebooks/output_*
 
 # PyCharm directory
 .idea/
