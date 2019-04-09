@@ -1,9 +1,10 @@
-import numpy as np
-import xarray as xr
+#import numpy as np
+#import xarray as xr
 import pandas as pd
-import matplotlib.pyplot as plt
-from icedef import plot, tools, metocean
+#import matplotlib.pyplot as plt
+from icedef import metocean
 from icedef import statoil_arcticnet_data as sd
+from icedef.plot import *
 from astroML.stats import fit_bivariate_normal, bivariate_normal
 from matplotlib.patches import Ellipse
 
@@ -44,7 +45,7 @@ class TestCase:
 
     def plot_track(self, **kwargs):
 
-        fig, ax = plot.plot_track([self.ref_lats.values, self.ref_lons.values], **kwargs)
+        fig, ax = plot_track([self.ref_lats.values, self.ref_lons.values], **kwargs)
 
     def get_wind_velocity_df(self):
 
@@ -105,9 +106,9 @@ class TestCase:
 
         return bivariate_normal(*self.current_distribution, size=size).ravel()
 
-    def plot_distributions(self, ):
+    def plot_distributions(self, filename=None, current_only=False, wind_only=False):
 
-        fig = plt.figure(figsize=(10, 10))
+        fig = plt.figure()
 
         for i, df in enumerate([self.current_velocity_df, self.wind_velocity_df]):
 
@@ -115,6 +116,9 @@ class TestCase:
             V1 = df.v.values
             U2 = df.iu.values
             V2 = df.iv.values
+
+            if wind_only:
+                i = 1
 
             if i == 0:
 
@@ -132,28 +136,50 @@ class TestCase:
 
             if i == 0:
 
-                ax = fig.add_subplot(121, aspect='equal')
+                if current_only:
+
+                    subplot_number = 111
+
+                else:
+
+                    subplot_number = 121
+
+                ax = fig.add_subplot(subplot_number, aspect='equal')
                 ax.set_title('Current Correction Distribution')
 
             else:
 
-                ax = fig.add_subplot(122, aspect='equal')
+                if wind_only:
+
+                    subplot_number = 111
+
+                else:
+
+                    subplot_number = 122
+
+                ax = fig.add_subplot(subplot_number, aspect='equal')
                 ax.set_title('Wind Correction Distribution')
 
             ax.axhline(y=0, color='grey')
             ax.axvline(x=0, color='grey')
             ax.scatter(*params[0], color='k', zorder=2)
-            ax.annotate(s=f'{np.round(params[0], 2)}', xy=(params[0][0], params[0][1]), fontsize=14)
+            ax.annotate(s=f'{np.round(params[0], 2)}', xy=(params[0][0], params[0][1]))
 
             ax.scatter(U1 - U2, V1 - V2, color='r')
 
             ax.add_artist(ellipse1)
             ax.add_artist(ellipse2)
-            ax.set_xlabel('dU')
-            ax.set_ylabel('dV')
+            ax.set_xlabel('dU (m/s)')
+            ax.set_ylabel('dV (m/s)')
             i += 1
 
+            if current_only:
+                break
+
         fig.tight_layout()
+
+        if filename:
+            fig.savefig(filename, bbox_inches='tight')
 
 
 class TestCaseA(TestCase):
