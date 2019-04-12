@@ -43,12 +43,15 @@ class Results:
 
         self.data[label] = xds
 
-    def add_xy_to_existing_dataset(self, label):
+    def add_xy_to_existing_dataset(self, label, units='km'):
 
         xds = self.data[label]
         lons = xds['longitude'].values
         lats = xds['latitude'].values
         eastings, northings = self.map_lonlat_to_xy(lons, lats)
+        if units == 'km':
+            eastings /= 1000
+            northings /= 1000
         data_dict = {'easting': eastings, 'northing': northings}
         self.add_columns_to_existing_dataset(data_dict, label)
 
