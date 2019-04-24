@@ -8,6 +8,7 @@ from copy import deepcopy
 from scipy.optimize import minimize, differential_evolution
 from icedef import iceberg, metocean, drift, tools, timesteppers, plot, log
 
+from astroML.stats import bivariate_normal
 from logging import getLogger, DEBUG
 from time import gmtime, strftime
 
@@ -426,6 +427,8 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
         results['latitude'][i] = iceberg_.latitude
         results['longitude'][i] = iceberg_.longitude
 
+        searose = True
+
         if perturb_current:
 
             if isinstance(current_constants, (tuple, list, np.ndarray)):
@@ -436,7 +439,10 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
             else:
 
                 previous_current_sample = kwargs.get('current_sample')
-                current_correction_sample = testcase.sample_current_distribution()
+                if searose:
+                    current_correction_sample = bivariate_normal([0, 0], 0.14, 0.04, -1.39)
+                else:
+                    current_correction_sample = testcase.sample_current_distribution()
                 new_current_sample = previous_current_sample * (1 - smoothing_constant) + current_correction_sample * smoothing_constant
                 kwargs['current_sample'] = new_current_sample
                 kwargs['previous_current_sample'] = previous_current_sample
