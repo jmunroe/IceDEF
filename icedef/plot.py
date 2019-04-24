@@ -2,15 +2,21 @@
 """
 
 import matplotlib.pyplot as plt
-from mpl_toolkits.basemap import Basemap
-from matplotlib.animation import FuncAnimation
 import numpy as np
 import xarray as xr
+from matplotlib import rcParams
+from mpl_toolkits.basemap import Basemap
+from matplotlib.animation import FuncAnimation
 from pandas import to_datetime
+
+plt.rcParams['figure.figsize'] = (6, 6)
 
 SMALL_SIZE = 10
 MEDIUM_SIZE = 12
 LARGE_SIZE = 14
+
+plt.rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
+plt.rc('text', usetex=True)
 
 plt.rc('font', size=MEDIUM_SIZE)          # controls default text sizes
 plt.rc('axes', titlesize=LARGE_SIZE)     # fontsize of the axes title
@@ -19,6 +25,9 @@ plt.rc('xtick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=LARGE_SIZE)   # fontsize of the figure title
+
+rcParams['mathtext.fontset'] = 'stix'
+rcParams['font.family'] = 'STIXGeneral'
 
 
 def get_map(draw=False, **kwargs):
