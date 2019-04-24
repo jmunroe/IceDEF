@@ -35,8 +35,8 @@ class TestCase:
         # self.adcp_ds = tools.subset_ds(sd.get_adcp_ds(), self.observation_bounding_box)
         # self.wind_velocity_df = self.get_wind_velocity_df()
         # self.current_velocity_df = self.get_current_velocity_df()
-        self.avos_ds = xr.open_dataset('../notebooks/avos_ds.nc')
-        self.adcp_ds = xr.open_dataset('../notebooks/adcp_ds.nc')
+        self.avos_ds = xr.open_dataset('../notebooks/avos_ds.nc', autoclose=True)
+        self.adcp_ds = xr.open_dataset('../notebooks/adcp_ds.nc', autoclose=True)
         self.wind_velocity_df = pd.read_csv('../notebooks/wind_velocity_df.csv').drop(columns='Unnamed: 0')
         self.current_velocity_df = pd.read_csv('../notebooks/current_velocity_df.csv').drop(columns='Unnamed: 0')
 
@@ -129,10 +129,13 @@ class TestCase:
                 params = self.wind_distribution
 
             ellipse1 = Ellipse(xy=params[0], width=2 * params[1], height=2 * params[2], angle=np.rad2deg(params[3]),
-                               alpha=0.8, edgecolor='b', lw=4, facecolor='none')
+                               alpha=0.8, edgecolor='k', lw=4, facecolor='none')
             ellipse2 = Ellipse(xy=params[0], width=2 * 2 * params[1], height=2 * 2 * params[2],
                                angle=np.rad2deg(params[3]),
-                               alpha=0.8, edgecolor='b', lw=4, facecolor='none')
+                               alpha=0.8, edgecolor='k', lw=4, facecolor='none')
+            ellipse3 = Ellipse(xy=params[0], width=3 * 2 * params[1], height=3 * 2 * params[2],
+                               angle=np.rad2deg(params[3]),
+                               alpha=0.8, edgecolor='k', lw=4, facecolor='none')
 
             if i == 0:
 
@@ -145,7 +148,7 @@ class TestCase:
                     subplot_number = 121
 
                 ax = fig.add_subplot(subplot_number, aspect='equal')
-                ax.set_title('Current Correction Distribution')
+                #ax.set_title('Current Correction Distribution')
 
             else:
 
@@ -158,17 +161,21 @@ class TestCase:
                     subplot_number = 122
 
                 ax = fig.add_subplot(subplot_number, aspect='equal')
-                ax.set_title('Wind Correction Distribution')
+                #ax.set_title('Wind Correction Distribution')
 
-            ax.axhline(y=0, color='grey')
-            ax.axvline(x=0, color='grey')
-            ax.scatter(*params[0], color='k', zorder=2)
-            ax.annotate(s=f'{np.round(params[0], 2)}', xy=(params[0][0], params[0][1]))
+            if wind_only:
+                ax.margins(x=0.3, y=0.4)
 
-            ax.scatter(U1 - U2, V1 - V2, color='r')
+            ax.axhline(y=0, color='k')
+            ax.axvline(x=0, color='k')
+            #ax.scatter(*params[0], color='k', zorder=2)
+            #ax.annotate(s=f'{np.round(params[0], 2)}', xy=(params[0][0], params[0][1]))
+
+            ax.scatter(U1 - U2, V1 - V2, color='grey')
 
             ax.add_artist(ellipse1)
             ax.add_artist(ellipse2)
+            ax.add_artist(ellipse3)
             ax.set_xlabel('dU (m/s)')
             ax.set_ylabel('dV (m/s)')
             i += 1
