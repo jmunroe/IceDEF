@@ -17,6 +17,7 @@ class Results:
     def __init__(self):
 
         self.map = None
+        self.add_forces = True
         self.data = {}
 
     def add_map(self, map_=plot.get_map()):
@@ -244,8 +245,10 @@ class Simulator:
         if label is not None:
 
             self.results.add_dataset(results, label)
-            self.results.add_columns_from_csv_to_existing_dataset('./debug.log',
-               ['Fax','Fay','Fwx','Fwy','Fcx','Fcy','Fwpx','Fwpy','Vwx','Vwy','Vcx','Vcy','Amwx','Amwy'], label)
+
+            if self.results.add_forces:
+                self.results.add_columns_from_csv_to_existing_dataset('./debug.log',
+                   ['Fax','Fay','Fwx','Fwy','Fcx','Fcy','Fwpx','Fwpy','Vwx','Vwy','Vcx','Vcy','Amwx','Amwy'], label)
 
         else:
             return results
