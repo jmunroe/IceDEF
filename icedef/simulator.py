@@ -361,6 +361,8 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
     percent_to_perturb_Ca_by = kwargs.pop('percent_to_perturb_Ca_by', 0)
     percent_to_perturb_Cw_by = kwargs.pop('percent_to_perturb_Cw_by', 0)
 
+    searose = kwargs.pop('searose', False)
+
     # Initialize arrays
     times = np.zeros(nt, dtype='datetime64[ns]')
 
@@ -426,8 +428,6 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
         times[i] = iceberg_.time
         results['latitude'][i] = iceberg_.latitude
         results['longitude'][i] = iceberg_.longitude
-
-        searose = True
 
         if perturb_current:
 
