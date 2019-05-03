@@ -5,7 +5,6 @@ import cmath
 import numpy as np
 from icedef.constants import *
 
-
 def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
     """This function performs interpolations for current and wind velocities and then runs the drift model.
 
@@ -24,67 +23,80 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
         ay (float): y-component of iceberg acceleration in m/s.
     """
 
-    dt = kwargs.pop('time_step', np.timedelta64(300, 's'))
-
-    fast_interpolation = kwargs.pop('fast_interpolation', True)
-
+    # User can perturb wind and current velocities by adding a correction
     current_sample = kwargs.pop('current_sample', np.array([0, 0]))
-    #current_sample = np.array([0.03, -0.01])
-    previous_current_sample = kwargs.pop('previous_current_sample', np.array([0, 0]))
     wind_sample = kwargs.pop('wind_sample', np.array([0, 0]))
-    #wind_sample = np.array([-5.08, -3.39])
-    previous_wind_sample = kwargs.pop('previous_current_sample', np.array([0, 0]))
+
+    # User can either specify float values for wind and current velocities directly
+    Vcx = kwargs.pop('eastward_current_velocity')
+    Vcy = kwargs.pop('northward_current_velocity')
+    Vmwx = kwargs.pop('eastward_mean_current_velocity')
+    Vmwy = kwargs.pop('northward_mean_current_velocity')
+    Amwx = kwargs.pop('eastward_mean_current_acceleration')
+    Amwy = kwargs.pop('northward_mean_current_acceleration')
+    Vwx = kwargs.pop('eastward_wind_velocity')
+    Vwy = kwargs.pop('northward_wind_velocity')
+
+    # Or user can submit metocean fields and interpolate within them
+    dt = kwargs.pop('time_step', np.timedelta64(300, 's'))
+    fast_interpolation = kwargs.pop('fast_interpolation', True)
+    # If fast interpolation they submit interpolators with .interpolate method
+    current_interpolator = kwargs.pop('current_interpolator')
+    wind_interpolator = kwargs.pop('wind_interpolator')
+    # Else they submit xarray.DataArray objects (so .interp can be called)
+    Vcxs = kwargs.pop('eastward_current')
+    Vcys = kwargs.pop('northward_current')
+    Vwxs = kwargs.pop('eastward_wind')
+    Vwys = kwargs.pop('northward_wind')
 
 
-    if fast_interpolation:
 
-        current_interpolator = kwargs.pop('current_interpolator')
-        Vcx, Vcy = current_interpolator((t, lat, lon)) + current_sample
-        wind_interpolator = kwargs.pop('wind_interpolator')
-        Vwx, Vwy = wind_interpolator((t, lat, lon)) + wind_sample
+    if all(variable is not None for variable in [Vcx, Vcy, Vmwx, Vmwy, Amwx, Amwy]):
 
-        Vcx_left, Vcy_left = current_interpolator((t - dt, lat, lon))
-        Vcx_right, Vcy_right = current_interpolator((t + dt, lat, lon))
-
-        #previous_Vcx, previous_Vcy = current_interpolator((t - dt, lat, lon)) + previous_current_sample
+        interpolate = False
 
     else:
 
-        Vcxs = kwargs.pop('eastward_current')
-        Vcys = kwargs.pop('northward_current')
-        Vwxs = kwargs.pop('eastward_wind')
-        Vwys = kwargs.pop('northward_wind')
+        interpolate = True
 
-        Vcx = Vcxs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[0]
-        Vcy = Vcys.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[1]
-        Vwx = Vwxs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + wind_sample[0]
-        Vwy = Vwys.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + wind_sample[1]
+    if interpolate:
 
-        Vcx_left = Vcxs.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values
-        Vcx_right = Vcxs.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values
-        Vcy_left = Vcys.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values
-        Vcy_right = Vcys.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values
+        if fast_interpolation:
 
-        #previous_Vcx = Vcxs.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values + previous_current_sample[0]
-        #previous_Vcy = Vcys.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values + previous_current_sample[1]
+            Vcx, Vcy = current_interpolator((t, lat, lon)) + current_sample
+            Vwx, Vwy = wind_interpolator((t, lat, lon)) + wind_sample
 
-        #
+            Vcx_left, Vcy_left = current_interpolator((t - dt, lat, lon))
+            Vcx_right, Vcy_right = current_interpolator((t + dt, lat, lon))
 
-    Amwx = (Vcx_right - Vcx_left) / (dt.item().total_seconds() * 2)
-    Amwy = (Vcy_right - Vcy_left) / (dt.item().total_seconds() * 2)
+        else:
 
-    #Amwx = (Vcx - previous_Vcx) / (dt.item().total_seconds())
-    #Amwy = (Vcy - previous_Vcy) / (dt.item().total_seconds())
+            Vcx = Vcxs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[0]
+            Vcy = Vcys.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + current_sample[1]
+            Vwx = Vwxs.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + wind_sample[0]
+            Vwy = Vwys.interp(time=t, latitude=lat, longitude=lon, assume_sorted=True).values + wind_sample[1]
 
+            Vcx_left = Vcxs.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values
+            Vcx_right = Vcxs.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values
+            Vcy_left = Vcys.interp(time=t - dt, latitude=lat, longitude=lon, assume_sorted=True).values
+            Vcy_right = Vcys.interp(time=t + dt, latitude=lat, longitude=lon, assume_sorted=True).values
+
+
+        Vmwx = np.mean([Vcx_left, Vcx_right])
+        Vmwy = np.mean([Vcy_left, Vcx_right])
+        Amwx = (Vcx_right - Vcx_left) / (dt.item().total_seconds() * 2)
+        Amwy = (Vcy_right - Vcy_left) / (dt.item().total_seconds() * 2)
+
+
+    # Kwargs for drift function
     kwargs['Vcx'] = Vcx
     kwargs['Vcy'] = Vcy
     kwargs['Vwx'] = Vwx
     kwargs['Vwy'] = Vwy
     kwargs['Amwx'] = Amwx
     kwargs['Amwy'] = Amwy
-    kwargs['Vmwx'] = Vcx #(Vcx + previous_Vcx) / 2
-    kwargs['Vmwy'] = Vcy #(Vcy + previous_Vcy) / 2
-
+    kwargs['Vmwx'] = Vmwx
+    kwargs['Vmwy'] = Vmwy
     kwargs['phi'] = lat
 
     ax, ay = newtonian_drift(vx, vy, **kwargs)
@@ -109,17 +121,14 @@ def newtonian_drift(Vx, Vy, **kwargs):
     Omega = EARTH_ROTATION_RATE
     rhoa = AIR_DENSITY
     rhow = SEAWATER_DENSITY
-
     Vwx = kwargs.pop('Vwx')
     Vwy = kwargs.pop('Vwy')
     Vcx = kwargs.pop('Vcx')
     Vcy = kwargs.pop('Vcy')
-
     Amwx = kwargs.pop('Amwx', 0)
     Amwy = kwargs.pop('Amwy', 0)
     Vmwx = kwargs.pop('Vmwx', Vcx)
     Vmwy = kwargs.pop('Vmwy', Vcy)
-
     Ca = kwargs.pop('form_drag_coefficient_in_air', 1.5)
     Cw = kwargs.pop('form_drag_coefficient_in_water', 1.5)
     Cda = kwargs.pop('skin_drag_coefficient_in_air', 2.5e-4)

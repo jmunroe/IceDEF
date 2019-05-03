@@ -7,7 +7,6 @@ dependencies:
   - netcdf4=1.4.0=py36ha06eab4_1
   - xarray=0.10.8=py36_0
   - asn1crypto=0.24.0=py36_0
-  - basemap=1.1.0=py36_4
   - ca-certificates=2018.4.16=0
   - cartopy=0.16.0=py36_0
   - ipykernel=4.8.2=py36_0

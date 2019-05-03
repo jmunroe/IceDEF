@@ -2,7 +2,7 @@
 #import xarray as xr
 import pandas as pd
 #import matplotlib.pyplot as plt
-from icedef import metocean
+from icedef import metocean, tools
 from icedef import statoil_arcticnet_data as sd
 from icedef.plot import *
 from astroML.stats import fit_bivariate_normal, bivariate_normal

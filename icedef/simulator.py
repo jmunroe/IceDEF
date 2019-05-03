@@ -417,17 +417,13 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
             'wind_sample': np.array([0, 0])
         }
 
-    #current_correction_samples = read_csv('/home/evankielley/current_correction_samples.csv')
-    #current_correction_samples = current_correction_samples.drop(columns='Unnamed: 0')
-
-    #wind_correction_samples = read_csv('/home/evankielley/wind_correction_samples.csv')
-    #wind_correction_samples = wind_correction_samples.drop(columns='Unnamed: 0')
-
     for i in range(nt):
 
-        times[i] = iceberg_.time
-        results['latitude'][i] = iceberg_.latitude
-        results['longitude'][i] = iceberg_.longitude
+        times[i] = t = iceberg_.time
+        results['latitude'][i] = lat = iceberg_.latitude
+        results['longitude'][i] = lon = iceberg_.longitude
+        eastward_current_velocity, northward_current_velocity = ocean.current.interpolate((t, lat, lon))
+        eastward_wind_velocity, northward_wind_velocity = atmosphere.wind.interpolate((t, lat, lon))
 
         if perturb_current:
 
@@ -447,6 +443,9 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
                 kwargs['current_sample'] = new_current_sample
                 kwargs['previous_current_sample'] = previous_current_sample
 
+            eastward_current_velocity += new_current_sample[0]
+            northward_current_velocity += new_current_sample[1]
+
         if perturb_wind:
 
             if isinstance(wind_constants, (tuple, list, np.ndarray)):
@@ -462,13 +461,8 @@ def run_simulation(time_frame, start_location, start_velocity=(0, 0), **kwargs):
                 kwargs['wind_sample'] = new_wind_sample
                 kwargs['previous_wind_sample'] = previous_wind_sample
 
-        if percent_to_perturb_Ca_by:
-            percentage = percent_to_perturb_Ca_by
-            kwargs['form_drag_coefficient_in_air'] = Ca + Ca * float(np.random.randint(-percentage, percentage, 1) / 100)
-
-        if percent_to_perturb_Cw_by:
-            percentage = percent_to_perturb_Cw_by
-            kwargs['form_drag_coefficient_in_water'] = Cw + Cw * float(np.random.randint(-percentage, percentage, 1) / 100)
+            eastward_wind_velocity += new_wind_sample[0]
+            northward_wind_velocity += new_wind_sample[1]
 
         if drift_model is drift.newtonian_drift_wrapper:
 

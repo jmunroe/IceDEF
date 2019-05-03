@@ -10,7 +10,7 @@ from urllib.request import urlretrieve
 from datetime import date, timedelta
 from astroML.stats import bivariate_normal
 from pandas import Timestamp
-from icedef import plot
+from icedef import plot, interpolate
 
 
 class Metocean:
@@ -82,7 +82,8 @@ class Ocean:
         elif model == 'ECMWF':
 
             self.ID = "GLOBAL_ANALYSIS_FORECAST_PHY_001_024"
-            self.PATH = 'http://icedef.munroelab.ca/data/ECMWF/ocean/daily/'
+            #self.PATH = 'http://icedef.munroelab.ca/data/ECMWF/ocean/daily/'
+            self.PATH = 'https://s3.amazonaws.com/openice-data/metocean/ECMWF/ocean/'
             self.data = xr.open_mfdataset(get_files(self.ID, self.PATH, date_bounds)).squeeze('depth').rename(
                                                     {'uo': 'eastward_velocity', 'vo': 'northward_velocity'})
 
@@ -102,7 +103,7 @@ class Ocean:
 
     def animate_field(self):
 
-        u, v = self.current.eastward_velocities, self.current.northward_velocities
+        u, v = self.current.eastward_velocities.values, self.current.northward_velocities.values
         times, lats, lons = self.data.time.values, self.data.latitude.values, self.data.longitude.values
 
         return plot.animate_field(lats, lons, times, u, v)
@@ -121,6 +122,7 @@ class Atmosphere:
             model (str): name of atmosphere model.
             constants (tuple of float): constant velocity component values (x, y) in m/s.
         """
+        self.model = model
 
         if constants is not None:
 
@@ -138,10 +140,16 @@ class Atmosphere:
         elif model == 'ECMWF':
 
             self.ID = "WIND_GLO_WIND_L4_NRT_OBSERVATIONS_012_004"
-            self.PATH = 'http://icedef.munroelab.ca/data/ECMWF/atm/daily/'
-            self.data = xr.open_mfdataset(get_files(self.ID, self.PATH, date_bounds)).squeeze('depth').rename(
+            #self.PATH = 'http://icedef.munroelab.ca/data/ECMWF/atm/daily/'
+            # self.data = xr.open_mfdataset(get_files(self.ID, self.PATH, date_bounds)).squeeze('depth').rename(
+            #     {'eastward_wind': 'eastward_velocity',
+            #      'northward_wind': 'northward_velocity'})
+            self.PATH = 'https://s3.amazonaws.com/openice-data/metocean/ECMWF/atmosphere/'
+            self.data = xr.open_mfdataset(get_files(self.ID, self.PATH, date_bounds)).rename(
                 {'eastward_wind': 'eastward_velocity',
-                 'northward_wind': 'northward_velocity'})
+                 'northward_wind': 'northward_velocity',
+                 'lat': 'latitude',
+                 'lon': 'longitude'})
 
         elif model == 'NARR':
             self.ID = "NCEP_North_American_Regional_Reanalysis_NARR"
@@ -162,8 +170,13 @@ class Atmosphere:
 
     def animate_field(self):
 
-        u, v = self.wind.eastward_velocities, self.wind.northward_velocities
-        times, lats, lons = self.data.time.values, self.data.latitude.values, self.data.longitude.values
+        if self.model == 'ECMWF':
+            u, v = self.wind.eastward_velocities.values, self.wind.northward_velocities.values
+            times, lats, lons = self.data.time.values, self.data.latitude.values, self.data.longitude.values
+
+        elif self.model == 'NARR':
+            u, v = self.wind.eastward_velocities.values[:, :, :-1], self.wind.northward_velocities.values[:, :, :-1]
+            times, lats, lons = self.data.time.values, self.data.latitude.values, self.data.longitude.values[:-1]
 
         return plot.animate_field(lats, lons, times, u, v)
 
@@ -197,8 +210,9 @@ class Velocity:
                                                ('latitude', data.latitude.values),
                                                ('longitude', data.longitude.values)])
 
-        self.interpolator = Interpolate((data.time.values, data.latitude.values, data.longitude.values),
-                                        self.eastward_velocities.values, self.northward_velocities.values)
+        self.interpolator = interpolate.UniformRegularLinearInterpolator(
+            (data.time.values, data.latitude.values, data.longitude.values),
+            self.eastward_velocities.values, self.northward_velocities.values)
 
         self.interpolate = self.interpolator.interpolate
 
@@ -220,95 +234,6 @@ class Velocity:
 
             print('Invalid distribution type. Options are: bivariate_normal.')
             return None
-
-
-class Interpolate:
-
-    def __init__(self, grid_vectors, *data, **kwargs):
-
-        self.data = data
-        self.grid_vectors = grid_vectors
-        self.reference_time = kwargs.pop('reference_time', np.datetime64('1950-01-01T00:00'))
-        self.time_units = kwargs.pop('time_units', 'h')
-        self.grid_info = get_grid_info(grid_vectors, **kwargs)
-        self.xarray_interp = kwargs.pop('xarray_interp', False)
-
-    def interpolate(self, point, xarray_interp=False):
-
-        point_list = []
-
-        for p in point:
-            if isinstance(p, np.datetime64):
-                p = (p - self.reference_time) / np.timedelta64(1, self.time_units)
-            point_list.append(p)
-
-        point = tuple(point_list)
-
-        if self.xarray_interp:
-            xarray_interp = True
-
-        if xarray_interp:
-            values = []
-            for data in self.data:
-                values.append(data.interp(time=point[0], latitude=point[1], longitude=point[2], assume_sorted=True))
-            return tuple(values)
-
-        else:
-            return linear_interpolation_on_uniform_regular_grid(self.grid_info, point, *self.data)
-
-
-def linear_interpolation_on_uniform_regular_grid(grid_info, point, *data):
-
-    data_list = [None] * len(data)
-
-    for dim in range(len(point)):
-
-        x0, dx, xn = grid_info[dim]
-        xi = point[dim]
-
-        try:
-            assert x0 <= xi <= xn, f'Point out of range in dim {dim} ({xi} is not in ({x0}, {xn})).'
-        except TypeError as e:
-            print(e, f'(in dim {dim}: x0 = {x0}, xi = {xi}, and xn = {xn})')
-
-        index = (xi - x0) / dx
-        index_floor = int(np.floor(index))
-        index_diff = index - index_floor
-
-        for i, data_ in enumerate(data):
-            data_slice = data_[index_floor: index_floor + 2, ...]
-            data_list[i] = (1 - index_diff) * data_slice[0, ...] + index_diff * data_slice[1, ...]
-
-        data = np.array(data_list)
-
-    if len(data) == 1:
-        return data[0]
-
-    else:
-        return data
-
-
-def get_grid_info(grid_vectors, **kwargs):
-
-    reference_time = kwargs.pop('reference_time', np.datetime64('1950-01-01T00:00'))
-    time_units = kwargs.pop('time_units', 'h')
-
-    grid_info = []
-
-    for grid_vector in grid_vectors:
-
-        if isinstance(grid_vector, xr.core.dataarray.DataArray):
-            grid_vector = grid_vector.values
-
-        if isinstance(grid_vector[0], np.datetime64):
-            grid_vector = (grid_vector - reference_time) / np.timedelta64(1, time_units)
-
-        grid_vector_min = np.min(grid_vector[0])
-        grid_vector_max = np.max(grid_vector[-1])
-        grid_vector_step = np.mean(np.diff(grid_vector))
-        grid_info.append([grid_vector_min, grid_vector_step, grid_vector_max])
-
-    return grid_info
 
 
 def fill_data_with_constant_value(data, **kwargs):

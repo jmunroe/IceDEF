@@ -15,9 +15,6 @@ SMALL_SIZE = 10
 MEDIUM_SIZE = 12
 LARGE_SIZE = 14
 
-plt.rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
-plt.rc('text', usetex=True)
-
 plt.rc('font', size=MEDIUM_SIZE)          # controls default text sizes
 plt.rc('axes', titlesize=LARGE_SIZE)     # fontsize of the axes title
 plt.rc('axes', labelsize=LARGE_SIZE)     # fontsize of the x and y labels
@@ -25,9 +22,6 @@ plt.rc('xtick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
 plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
 plt.rc('figure', titlesize=LARGE_SIZE)   # fontsize of the figure title
-
-rcParams['mathtext.fontset'] = 'stix'
-rcParams['font.family'] = 'STIXGeneral'
 
 
 def get_map(draw=False, **kwargs):
@@ -304,21 +298,28 @@ def animate_field(lats, lons, times, u, v, gap=10, time_format='%Y-%m-%d %H'):
     def dt64_to_str(t): return to_datetime(t).strftime(time_format)
 
     fig = plt.figure(figsize=(10, 10))
-    map_ = get_map()
+    map_ = get_map(projection='merc')
 
-    magnitude = np.sqrt(u ** 2 + v ** 2)
+    magnitude = np.sqrt(u**2 + v**2)
 
-    image = map_.imshow(magnitude[0, :, :], origin='lower')
+    x, y = map_(lons, lats)
+    xx, yy = np.meshgrid(x, y)
+    image = map_.pcolormesh(xx, yy, magnitude[0, :, :])
     plt.colorbar()
     title = plt.title(dt64_to_str(times[0]))
 
-    meshed_lons, meshed_lats = np.meshgrid(lons[::gap], lats[::gap])
-    x, y = map_(meshed_lons, meshed_lats)
-    quiver = map_.quiver(x, y, u[0, ::gap, ::gap], v[0, ::gap, ::gap])
+    lons_ = lons[::gap]
+    lats_ = lats[::gap]
+    u_ = u[:, ::gap, ::gap]
+    v_ = v[:, ::gap, ::gap]
+
+    x_, y_ = map_(lons_, lats_)
+    quiver = map_.quiver(x_, y_, u_[0, :, :], v_[0, :, :])
 
     def animate(i):
-        image.set_data(magnitude[i, :, :])
+
+        image.set_array(magnitude[i, :-1, :-1].ravel())
         title.set_text(dt64_to_str(times[i]))
-        quiver.set_UVC(u[i, ::gap, ::gap], v[i, ::gap, ::gap])
+        quiver.set_UVC(u_[i, :, :], v_[i, :, :])
 
     return FuncAnimation(fig, animate, frames=len(times))
