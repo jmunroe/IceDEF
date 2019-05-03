@@ -93,6 +93,124 @@ class DynamicDriftModel:
         return Vx, Vy, Ax, Ay
 
 
+class AnalyticalDriftModel:
+
+    def __init__(self, **kwargs):
+
+        self.l = l = kwargs.pop('length', 160)
+        self.w = kwargs.pop('width', 160)
+        self.Ca = kwargs.pop('form_drag_coefficient_in_air', 1.5)
+        self.Cw = kwargs.pop('form_drag_coefficient_in_water', 1.5)
+
+    def drift(self, **kwargs):
+        """This function computes the velocity of an iceberg using an analytical drift model.
+
+        Returns:
+            viu (float): x-component of iceberg velocity in m/s.
+            viv (float): y-component of iceberg velocity in m/s.
+        """
+
+        vwu, vwv = kwargs.pop('current_velocity')
+        vau, vav = kwargs.pop('wind_velocity')
+        y = kwargs.pop('latitude')
+
+        l = self.l
+        w = self.w
+        Cw = self.Ca
+        Ca = self.Cw
+
+        Omega = EARTH_ROTATION_RATE
+        rhow = SEAWATER_DENSITY
+        rhoa = AIR_DENSITY
+        rhoi = ICEBERG_DENSITY
+
+        gamma = np.sqrt(rhoa * (rhow - rhoi) / rhow / rhoi * (Ca / Cw))
+        S = np.pi * ((l * w) / (l + w))
+        f = 2 * Omega * np.sin((np.abs(y) * np.pi) / 180)
+        Lambda = np.sqrt(2) * Cw * (gamma * np.sqrt(vau ** 2 + vav ** 2)) / (f * S)
+
+        if Lambda < 0.1:
+            alpha = Lambda * (Lambda ** 4 * (Lambda ** 4 * (Lambda ** 4 * (-0.0386699020961393 * Lambda ** 4 +
+                0.055242717280199) - 0.0883883476483184) + 0.176776695296637) - 0.707106781186548)
+
+        else:
+            alpha = np.multiply(np.divide(np.sqrt(2), np.power(Lambda, 3)), (1 - np.sqrt(1 + np.power(Lambda, 4))))
+
+        if Lambda < 0.6:
+            beta = Lambda ** 3 * (Lambda ** 4 * (Lambda ** 4 * (Lambda ** 4 * (Lambda ** 4 *
+                (Lambda ** 4 * (Lambda ** 4 * (Lambda ** 4 * (Lambda ** 4 * (0.0153268598203613 *
+                Lambda ** 4 - 0.0151656272365985) + 0.0180267866272764) + 0.0219176256311202) -
+                0.0274446790511418) + 0.0357675015202851) - 0.0493731785691779) + 0.0745776683282687) -
+                0.132582521472478) + 0.353553390593274)
+
+        else:
+            beta = np.real(np.multiply(np.divide(1, np.power(Lambda, 3)), cmath.sqrt(np.multiply((4 +
+                np.power(Lambda, 4)), cmath.sqrt(1 + np.power(Lambda,4))) - 3 * np.power(Lambda, 4) - 4)))
+
+        viu = vwu + gamma * (-alpha * vav + beta * vau)
+        viv = vwv + gamma * (alpha * vau + beta * vav)
+
+        return viu, viv
+
+
+def analytical_drift(x, y, **kwargs):
+    """This function computes the velocity of an iceberg using an analytical drift model.
+
+    Args:
+        x (float): longitude
+        y (float): latitude
+        **kwargs: coming soon - see source code for now.
+
+    Returns:
+        viu (float): x-component of iceberg velocity in m/s.
+        viv (float): y-component of iceberg velocity in m/s.
+    """
+
+    vwu = kwargs.pop('vwu')
+    vwv = kwargs.pop('vwv')
+    vau = kwargs.pop('vau')
+    vav = kwargs.pop('vav')
+
+    l = kwargs.pop('waterline_length', 160)
+    w = kwargs.pop('waterline_length', 160)  # note: currently all icebergs are cuboid
+
+    Cw = kwargs.pop('form_drag_coefficient_in_water', 0.9)
+    Ca = kwargs.pop('form_drag_coefficient_in_air', 1.3)
+
+    Omega = EARTH_ROTATION_RATE
+    rhow = SEAWATER_DENSITY
+    rhoa = AIR_DENSITY
+    rhoi = ICEBERG_DENSITY
+
+    gamma = np.sqrt(rhoa * (rhow - rhoi) / rhow / rhoi * (Ca / Cw))
+    S = np.pi * ((l * w) / (l + w))
+    f = 2 * Omega * np.sin((np.abs(y) * np.pi) / 180)
+    Lambda = np.sqrt(2) * Cw * (gamma * np.sqrt(vau ** 2 + vav ** 2)) / (f * S)
+
+    if Lambda < 0.1:
+        alpha = Lambda * (Lambda ** 4 * (Lambda ** 4 * (Lambda ** 4 * (-0.0386699020961393 * Lambda ** 4 +
+            0.055242717280199) - 0.0883883476483184) + 0.176776695296637) - 0.707106781186548)
+
+    else:
+        alpha = np.multiply(np.divide(np.sqrt(2), np.power(Lambda, 3)), (1 - np.sqrt(1 + np.power(Lambda, 4))))
+
+    if Lambda < 0.6:
+        beta = Lambda ** 3 * (Lambda ** 4 * (Lambda ** 4 * (Lambda ** 4 * (Lambda ** 4 *
+            (Lambda ** 4 * (Lambda ** 4 * (Lambda ** 4 * (Lambda ** 4 * (0.0153268598203613 *
+            Lambda ** 4 - 0.0151656272365985) + 0.0180267866272764) + 0.0219176256311202) -
+            0.0274446790511418) + 0.0357675015202851) - 0.0493731785691779) + 0.0745776683282687) -
+            0.132582521472478) + 0.353553390593274)
+
+    else:
+        beta = np.real(np.multiply(np.divide(1, np.power(Lambda, 3)), cmath.sqrt(np.multiply((4 +
+            np.power(Lambda, 4)), cmath.sqrt(1 + np.power(Lambda,4))) - 3 * np.power(Lambda, 4) - 4)))
+
+    viu = vwu + gamma * (-alpha * vav + beta * vau)
+    viv = vwv + gamma * (alpha * vau + beta * vav)
+
+    return viu, viv
+
+
 def compute_coriolis_parameter(latitude):
 
     Omega = EARTH_ROTATION_RATE
