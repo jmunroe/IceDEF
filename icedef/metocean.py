@@ -57,7 +57,7 @@ class Ocean:
     ID = None
     PATH = None
 
-    def __init__(self, date_bounds, model='ECMWF', constants=None):
+    def __init__(self, date_bounds, model='ECMWF', constants=None, interpolator=interpolate.UniformRegularLinearInterpolator):
         """This class creates an object that contains ocean data from an available ocean model or artificially.
 
         Args:
@@ -98,7 +98,8 @@ class Ocean:
 
             print('Invalid model.')
 
-        self.current = Velocity(self.data)
+        self.interpolator = interpolator
+        self.current = Velocity(self.data, interpolator=self.interpolator)
         self.data.close()
 
     def animate_field(self):
@@ -114,7 +115,7 @@ class Atmosphere:
     ID = None
     PATH = None
 
-    def __init__(self, date_bounds, model='NARR', constants=None):
+    def __init__(self, date_bounds, model='NARR', constants=None, interpolator=interpolate.UniformRegularLinearInterpolator):
         """This class creates an object that contains atmosphere data from an available atmosphere model or artificially.
 
         Args:
@@ -165,7 +166,8 @@ class Atmosphere:
 
             print('Invalid model.')
 
-        self.wind = Velocity(self.data)
+        self.interpolator = interpolator
+        self.wind = Velocity(self.data, interpolator=self.interpolator)
         self.data.close()
 
     def animate_field(self):
@@ -183,7 +185,7 @@ class Atmosphere:
 
 class Velocity:
 
-    def __init__(self, data, distribution=None):
+    def __init__(self, data, distribution=None, interpolator=interpolate.UniformRegularLinearInterpolator):
 
         self.distribution = distribution
         self.eastward_velocities = xr.DataArray(data=data.eastward_velocity.values,
@@ -210,9 +212,8 @@ class Velocity:
                                                ('latitude', data.latitude.values),
                                                ('longitude', data.longitude.values)])
 
-        self.interpolator = interpolate.UniformRegularLinearInterpolator(
-            (data.time.values, data.latitude.values, data.longitude.values),
-            self.eastward_velocities.values, self.northward_velocities.values)
+        self.interpolator = interpolator((data.time.values, data.latitude.values, data.longitude.values),
+                                         self.eastward_velocities.values, self.northward_velocities.values)
 
         self.interpolate = self.interpolator.interpolate
 

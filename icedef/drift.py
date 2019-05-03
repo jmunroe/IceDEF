@@ -5,6 +5,207 @@ import cmath
 import numpy as np
 from icedef.constants import *
 
+
+class DynamicDriftModel:
+
+    def __init__(self, **kwargs):
+
+        self.Ca = kwargs.pop('form_drag_coefficient_in_air', 1.5)
+        self.Cw = kwargs.pop('form_drag_coefficient_in_water', 1.5)
+        self.Cda = kwargs.pop('skin_drag_coefficient_in_air', 2.5e-4)
+        self.Cdw = kwargs.pop('skin_drag_coefficient_in_water', 5e-4)
+        self.As = kwargs.pop('sail_area', 9600.0)
+        self.Ak = kwargs.pop('keel_area', 48000.0)
+        self.At = kwargs.pop('top_area', 25600.0)
+        self.Ab = kwargs.pop('bottom_area', 25600.0)
+        self.M = kwargs.pop('mass', 5468160000.0)
+
+    def compute_air_drag_force(self, iceberg_velocity, wind_velocity):
+
+        Vx, Vy = iceberg_velocity
+        Vwx, Vwy = wind_velocity
+
+        rhoa = AIR_DENSITY
+        Ca = self.Ca; As = self.As; Cda = self.Cda; At = self.At
+
+        Fax = (0.5 * rhoa * Ca * As + rhoa * Cda * At) * np.sqrt((Vwx - Vx) ** 2 + (Vwy - Vy) ** 2) * (Vwx - Vx)
+        Fay = (0.5 * rhoa * Ca * As + rhoa * Cda * At) * np.sqrt((Vwx - Vx) ** 2 + (Vwy - Vy) ** 2) * (Vwy - Vy)
+
+        return Fax, Fay
+
+    def compute_water_drag_force(self, iceberg_velocity, current_velocity):
+
+        Vx, Vy = iceberg_velocity
+        Vcx, Vcy = current_velocity
+
+        rhow = SEAWATER_DENSITY
+        Cw = self.Cw; Ak = self.Ak; Cdw = self.Cdw; Ab = self.Ab
+
+        Fwx = (0.5 * rhow * Cw * Ak + rhow * Cdw * Ab) * np.sqrt((Vcx - Vx)**2 + (Vcy - Vy)**2) * (Vcx - Vx)
+        Fwy = (0.5 * rhow * Cw * Ak + rhow * Cdw * Ab) * np.sqrt((Vcx - Vx)**2 + (Vcy - Vy)**2) * (Vcy - Vy)
+
+        return Fwx, Fwy
+
+    def compute_coriolis_force(self, iceberg_velocity, coriolis_parameter):
+
+        Vx, Vy = iceberg_velocity
+
+        M = self.M
+        f = coriolis_parameter
+
+        Fcx = f * M * Vy
+        Fcy = -f * M * Vx
+
+        return Fcx, Fcy
+
+    def compute_water_pressure_gradient_force(self, mean_current_velocity, mean_current_acceleration, coriolis_parameter):
+
+        Vmwx, Vmwy = mean_current_velocity
+        Amwx, Amwy = mean_current_acceleration
+
+        M = self.M
+        f = coriolis_parameter
+
+        Fwpx = M * (Amwx - f * Vmwy)
+        Fwpy = M * (Amwy + f * Vmwx)
+
+        return Fwpx, Fwpy
+
+    def drift(self, iceberg_velocity, **kwargs):
+
+        Vx, Vy = iceberg_velocity
+        Vcx, Vcy = kwargs.pop('current_velocity')
+        Vmwx, Vmwy = kwargs.pop('mean_current_velocity')
+        Amwx, Amwy = kwargs.pop('mean_current_acceleration')
+        Vwx, Vwy = kwargs.pop('wind_velocity')
+        M = self.M
+        phi = kwargs.pop('latitude')
+        f = compute_coriolis_parameter(phi)
+
+        Fax, Fay = self.compute_air_drag_force((Vx, Vy), (Vwx, Vwy))
+        Fwx, Fwy = self.compute_water_drag_force((Vx, Vy), (Vcx, Vcy))
+        Fcx, Fcy = self.compute_coriolis_force((Vx, Vy), f)
+        Fwpx, Fwpy = self.compute_water_pressure_gradient_force((Vmwx, Vmwy), (Amwx, Amwy), f)
+
+        Ax = (Fax + Fwx + Fcx + Fwpx) / (M + 0.5 * M)
+        Ay = (Fay + Fwy + Fcy + Fwpy) / (M + 0.5 * M)
+
+        return Vx, Vy, Ax, Ay
+
+
+def compute_coriolis_parameter(latitude):
+
+    Omega = EARTH_ROTATION_RATE
+    phi = latitude
+
+    f = 2 * Omega * np.sin(np.deg2rad(phi))
+
+    return f
+
+
+def newtonian_drift(Vx, Vy, **kwargs):
+    """This function computes iceberg acceleration using a general Newtonian drift model.
+
+    Args:
+        Vx (float): x-component of iceberg velocity in m/s.
+        Vy (float): y-component of iceberg velocity in m/s.
+        **kwargs: coming soon - see source code for now.
+
+    Returns:
+        ax (float): x-component of iceberg acceleration in m/s.
+        ay (float): y-component of iceberg acceleration in m/s.
+    """
+
+    # Constants
+    Omega = EARTH_ROTATION_RATE
+    rhoa = AIR_DENSITY
+    rhow = SEAWATER_DENSITY
+    Vwx = kwargs.pop('Vwx')
+    Vwy = kwargs.pop('Vwy')
+    Vcx = kwargs.pop('Vcx')
+    Vcy = kwargs.pop('Vcy')
+    Amwx = kwargs.pop('Amwx', 0)
+    Amwy = kwargs.pop('Amwy', 0)
+    Vmwx = kwargs.pop('Vmwx', Vcx)
+    Vmwy = kwargs.pop('Vmwy', Vcy)
+    Ca = kwargs.pop('form_drag_coefficient_in_air', 1.5)
+    Cw = kwargs.pop('form_drag_coefficient_in_water', 1.5)
+    Cda = kwargs.pop('skin_drag_coefficient_in_air', 2.5e-4)
+    Cdw = kwargs.pop('skin_drag_coefficient_in_water', 5e-4)
+    As = kwargs.pop('sail_area', 9600.0)
+    Ak = kwargs.pop('keel_area', 48000.0)
+    At = kwargs.pop('top_area', 25600.0)
+    Ab = kwargs.pop('bottom_area', 25600.0)
+    M = kwargs.pop('mass', 5468160000.0)
+    phi = kwargs.pop('latitude', 50)
+
+    # Wind force
+    Fax = (0.5 * rhoa * Ca * As + rhoa * Cda * At) * np.sqrt((Vwx - Vx)**2 + (Vwy - Vy)**2) * (Vwx - Vx)
+    Fay = (0.5 * rhoa * Ca * As + rhoa * Cda * At) * np.sqrt((Vwx - Vx)**2 + (Vwy - Vy)**2) * (Vwy - Vy)
+
+    # Current force
+    ekman = kwargs.pop('ekman', False)
+
+    if ekman:
+
+        Fwx_list = []
+        Fwy_list = []
+        Vcx_list = []
+        Vcy_list = []
+
+        depth_vec = kwargs.pop('depth_vec', np.arange(0, -110, -10))
+
+        u_vec, v_vec = compute_ekman_spiral((Vwx, Vwy), (Vcx, Vcy), depth_vec)
+
+        for i in range(len(u_vec)):
+
+            Vcx, Vcy = u_vec[i], v_vec[i]
+
+            Vcx_list.append(Vcx)
+            Vcy_list.append(Vcy)
+
+            Fwx = (0.5 * rhow * Cw * Ak + rhow * Cdw * Ab) * np.sqrt((Vcx - Vx)**2 + (Vcy - Vy)**2) * (Vcx - Vx)
+            Fwy = (0.5 * rhow * Cw * Ak + rhow * Cdw * Ab) * np.sqrt((Vcx - Vx)**2 + (Vcy - Vy)**2) * (Vcy - Vy)
+
+            Fwx_list.append(Fwx)
+            Fwy_list.append(Fwy)
+
+        Vcx = np.mean(np.array(Vcx_list))
+        Vcy = np.mean(np.array(Vcy_list))
+
+        Fwx = np.mean(np.array(Fwx_list))
+        Fwy = np.mean(np.array(Fwy_list))
+
+    else:
+        Fwx = (0.5 * rhow * Cw * Ak + rhow * Cdw * Ab) * np.sqrt((Vcx - Vx)**2 + (Vcy - Vy)**2) * (Vcx - Vx)
+        Fwy = (0.5 * rhow * Cw * Ak + rhow * Cdw * Ab) * np.sqrt((Vcx - Vx)**2 + (Vcy - Vy)**2) * (Vcy - Vy)
+
+    # Coriolis Parameter
+    f = 2 * Omega * np.sin(np.deg2rad(phi))
+
+    # Coriolis force
+    Fcx = f * M * Vy
+    Fcy = -f * M * Vx
+
+    # Water Pressure Gradient Force
+    Vmwx = Vmwx
+    Vmwy = Vmwy
+    Amwx = Amwx
+    Amwy = Amwy
+    Fwpx = M * (Amwx - f * Vmwy)
+    Fwpy = M * (Amwy + f * Vmwx)
+
+    # Iceberg acceleration
+    ax = (Fax + Fwx + Fcx + Fwpx) / (M + 0.5 * M)
+    ay = (Fay + Fwy + Fcy + Fwpy) / (M + 0.5 * M)
+
+    log = kwargs.pop('log', None)
+
+    if log is not None:
+        log.info(f'{Fax},{Fay},{Fwx},{Fwy},{Fcx},{Fcy},{Fwpx},{Fwpy},{Vwx},{Vwy},{Vcx},{Vcy},{Amwx},{Amwy}')
+
+    return ax, ay
+
 def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
     """This function performs interpolations for current and wind velocities and then runs the drift model.
 
@@ -48,8 +249,6 @@ def newtonian_drift_wrapper(t, lon, lat, vx, vy, **kwargs):
     Vcys = kwargs.pop('northward_current')
     Vwxs = kwargs.pop('eastward_wind')
     Vwys = kwargs.pop('northward_wind')
-
-
 
     if all(variable is not None for variable in [Vcx, Vcy, Vmwx, Vmwy, Amwx, Amwy]):
 
